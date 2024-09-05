@@ -43,6 +43,10 @@ add_custom_target(qemu
 add_custom_target(qemu-debug
     COMMAND ${aarch64_qemu} ${qemu_flags} -gdb tcp::1234 -S
     DEPENDS image)
+
+add_custom_target(qemu-gdb
+    COMMAND ${arrch64_qemu} ${qemu_flags} -gdb tcp::1234 -S
+    DEPENDS image)
 add_custom_target(debug
     COMMAND ${aarch64_gdb} --nx --quiet
             -ex "set architecture aarch64"
