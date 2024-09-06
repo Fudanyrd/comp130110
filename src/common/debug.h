@@ -4,6 +4,8 @@
 
 #include <kernel/printk.h>
 
+#define BACKTRACE do { backtrace(); } while(0)
+
 #ifdef ASSERT
 #undef ASSERT
 // assertion
@@ -18,5 +20,25 @@
         }                                                   \
     } while (0)
 #endif
+
+#define STATIC_ASSERT(cond)                                 \
+    do { switch(0) { case (0): case (cond): break; }     \
+    } while(0)
+
+/**-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *                          DEBUG UTILITIES 
+ -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+*/
+
+/** Initialize the debug module */
+void debug_init(void);
+
+/** Print a block of memory 
+ * @param size size of the block
+ * @param off offset of dump
+ */
+void hexdump(unsigned char *start, unsigned long size, unsigned long off);
+
+/** Print the calling stack. */
+void backtrace(void);
 
 #endif // __COMMON_DEBUG_
