@@ -67,4 +67,11 @@ void hexdump(unsigned char *start, unsigned long size, unsigned long off);
 /** Print the calling stack. */
 void backtrace(void);
 
+/** Check that the memory is set to a value. 
+ * @param size size of memory block
+ * @param val expected value of memory.
+ * @return 1 if memory is set to a value.
+ */
+int Memchk(const unsigned char *start, unsigned long size, int val);
+
 #endif // __COMMON_DEBUG_

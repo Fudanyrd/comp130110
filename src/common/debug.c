@@ -101,6 +101,16 @@ void hexdump(uint8_t *start, size_t size, size_t off)
     return;
 }
 
+int Memchk(const uint8_t *start, size_t size, int val)
+{
+    for (size_t i = 0; i < size; i++) {
+        if (start[i] != (uint8_t)(val & 0xff)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static inline void *next_fptr(void *fptr)
 {
     return *(void **)(fptr);

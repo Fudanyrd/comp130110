@@ -40,6 +40,7 @@ void main()
     if (cpuid() == 0) {
         /* @todo: Clear BSS section.*/
         memset(edata, 0, (usize)(end - edata));
+        ASSERT(Memchk((unsigned char *)edata, (usize)(end - edata), 0x0));
         /* @end todo */
 
         smp_init();
