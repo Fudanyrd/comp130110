@@ -8,7 +8,7 @@ void debug_init(void)
     STATIC_ASSERT(sizeof(unsigned long) == 8);
     STATIC_ASSERT(sizeof(void *) == 8);
 
-    // it is still highly recommended NOT to make any 
+    // it is still highly recommended NOT to make any
     // assumptions about the ISA.
 
     // if there's other static members, initialize them.
@@ -20,13 +20,15 @@ static inline void *next_fptr(void *fptr);
 /** Returns the current program counter. */
 static inline void *fptr2addr(void *fptr);
 
-void backtrace(void) {
+void backtrace(void)
+{
     // the current frame pointer.
     void *fptr;
     // Arm ref manual page 34: x29 is frame pointer
     // asm volatile("ldr %0, [sp]" : "=r"(fptr));
     asm volatile("mov %0, x29" : "=r"(fptr));
 
+    // clang-format off
     /**
      * calling stack:
      * +-------+
@@ -41,6 +43,7 @@ void backtrace(void) {
      * |  x29  | -------------o
      * +-------+ 
      */
+    // clang-format on
 
     printk("kernel backtrace: ");
     while (fptr != NULL) {
@@ -50,10 +53,12 @@ void backtrace(void) {
     printk("\n");
 }
 
-static inline void *next_fptr(void *fptr) {
+static inline void *next_fptr(void *fptr)
+{
     return *(void **)(fptr);
 }
 
-static inline void *fptr2addr(void *fptr) {
+static inline void *fptr2addr(void *fptr)
+{
     return *(void **)(fptr + 0x8);
 }

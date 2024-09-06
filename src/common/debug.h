@@ -4,7 +4,10 @@
 
 #include <kernel/printk.h>
 
-#define BACKTRACE do { backtrace(); } while(0)
+#define BACKTRACE    \
+    do {             \
+        backtrace(); \
+    } while (0)
 
 #ifdef ASSERT
 #undef ASSERT
@@ -21,9 +24,14 @@
     } while (0)
 #endif
 
-#define STATIC_ASSERT(cond)                                 \
-    do { switch(0) { case (0): case (cond): break; }     \
-    } while(0)
+#define STATIC_ASSERT(cond) \
+    do {                    \
+        switch (0) {        \
+        case (0):           \
+        case (cond):        \
+            break;          \
+        }                   \
+    } while (0)
 
 /**-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *                          DEBUG UTILITIES 
