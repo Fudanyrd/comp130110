@@ -4,6 +4,7 @@
 #include <kernel/core.h>
 #include <common/string.h>
 #include <common/debug.h>
+#include <test/test_util.h>
 
 static volatile bool boot_secondary_cpus = false;
 
@@ -34,7 +35,7 @@ void main()
     /* end is .bss end addr */
     extern char end[];
     ASSERT(end != NULL && edata != NULL);
-    ASSERT(end >= edata);
+    ASSERT((void *)end >= (void *)edata);
 
     if (cpuid() == 0) {
         /* @todo: Clear BSS section.*/
@@ -44,6 +45,7 @@ void main()
         smp_init();
         uart_init();
         printk_init();
+        debug_init();
 
         /* @todo: Print "Hello, world! (Core 0)" */
         HELLO(0);
