@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+import os
+import sys
+
+args = sys.argv
+args.reverse()
+args = args[:-1]
+tools = [
+    '/usr/bin/addr2line', 
+    '/usr/bin/aarch64-linux-gnu-addr2line'
+]
+tool = None
+kernel = './build/src/kernel8.elf'
+
+# find addr2line
+for t in tools:
+    if os.path.exists(t):
+        tool = t
+        break
+
+if tool is None:
+    print("FATAL: cannot find addr2line");
+    exit()
+
+for arg in args:
+    os.system(f'{tool} -f -a -p -e {kernel} 0x{arg}')
