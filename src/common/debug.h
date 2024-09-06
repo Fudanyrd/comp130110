@@ -7,6 +7,7 @@
 // clang-format off
 /**
  * What if your kernel crashed?
+ * - Sit comfortably;
  * - Check what went wrong;
  * - Check again what went wrong;
  * - Check again and again what went wrong;

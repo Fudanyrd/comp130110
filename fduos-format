@@ -1,0 +1,37 @@
+#!/usr/bin/python3
+import subprocess
+import os
+
+# your tiny script to format all source codes
+
+def format(fn):
+    if not os.path.exists(fn):
+        print(f'cannot find {fn}')
+        return
+    os.system(
+        f'clang-format -i {fn}'
+    )
+
+def getfn():
+    res = []
+    code = subprocess.run(
+        "find -name *.c",
+        shell=True,
+        capture_output=True
+    )
+
+    res += str(code.stdout).split('\\n')
+    code = subprocess.run(
+        "find -name *.h",
+        shell=True,
+        capture_output=True
+    )
+    res += str(code.stdout).split('\\n')
+
+    return res;
+
+if __name__ == "__main__":
+    # format all source files
+    fns = getfn() 
+    for fn in fns:
+        format(fn)
