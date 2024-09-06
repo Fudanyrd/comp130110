@@ -4,6 +4,23 @@
 
 #include <kernel/printk.h>
 
+// clang-format off
+/**
+ * What if your kernel crashed?
+ * - Check what went wrong;
+ * - Check again what went wrong;
+ * - Check again and again what went wrong;
+ * 
+ * Your friends:
+ * - ASSERT and STATIC_ASSERT;
+ * - hexdump to investigate a bulk of memory;
+ * - backtracer;
+ * - gdb(-multiarch)
+ * 
+ * Remember, it is the job, no hard feelings.
+ */
+// clang-format on
+
 #define BACKTRACE    \
     do {             \
         backtrace(); \
