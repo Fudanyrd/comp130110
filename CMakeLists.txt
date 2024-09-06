@@ -37,11 +37,30 @@ set(qemu_flags
     -global virtio-mmio.force-legacy=false
     -kernel "${kernel_elf}")
 
+# build qemu with 1(unique) CPU for debugging
+# race conditions (partially) avoided
+set(qemu_unic_flags
+    -machine virt,gic-version=3
+    -cpu cortex-a72
+    -smp 1
+    -m 4096
+    -nographic
+    -monitor none
+    -serial "mon:stdio"
+    -global virtio-mmio.force-legacy=false
+    -kernel "${kernel_elf}")
+
 add_custom_target(qemu
     COMMAND ${aarch64_qemu} ${qemu_flags}
     DEPENDS image)
+add_custom_target(qemu-unic 
+    COMMAND ${aarch64_qemu} ${qemu_unic_flags}
+    DEPENDS image)
 add_custom_target(qemu-debug
     COMMAND ${aarch64_qemu} ${qemu_flags} -gdb tcp::1234 -S
+    DEPENDS image)
+add_custom_target(qemu-unic-debug
+    COMMAND ${aarch64_qemu} ${qemu_unic_flags} -gdb tcp::1234 -S
     DEPENDS image)
 
 add_custom_target(qemu-gdb
