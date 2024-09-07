@@ -8,7 +8,7 @@
         if (succ) {                  \
             printk("TEST PASSED\n"); \
         } else {                     \
-            printk("TEST FAILED\n")  \
+            printk("TEST FAILED\n");  \
         }                            \
     } while (0)
 
@@ -17,3 +17,6 @@ typedef void testfn(void);
 
 // test debug utilities
 void debug_test(void);
+
+// test bitmap impl
+void bitmap_test(void);
