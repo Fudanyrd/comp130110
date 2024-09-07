@@ -2,6 +2,7 @@
 #include <common/defines.h>
 #include <common/debug.h>
 #include "test_util.h"
+#include "test.h"
 
 static char buf[256];
 
@@ -10,6 +11,9 @@ static char buf[256];
  * @param batch number of bits allocated each time.
  */
 static void stress_tester(struct bitmap *bm, long batch);
+
+/**< ad-hoc tester */
+static void adhoc_tester(struct bitmap *bm);
 
 void bitmap_test(void)
 {
@@ -72,6 +76,11 @@ void bitmap_test(void)
     stress_tester(&bm, 23);
     stress_tester(&bm, 26);
 
+    // what if we do some ad-hoc testing?
+    ASSERT(Memchk((unsigned char *)buf, sizeof(buf), 0));
+    adhoc_tester(&bm);
+    ASSERT(Memchk((unsigned char *)buf, sizeof(buf), 0));
+
     // OK
     TEST_END;
 }
@@ -109,6 +118,116 @@ static void stress_tester(struct bitmap *bm, long batch)
             ASSERT(!bitmap_get(bm, p + i));
         }
         p += batch;
+    }
+
+    // ok.
+}
+
+#include "range.h"
+static void adhoc_tester(struct bitmap *bm)
+{
+    // ad-hoc tester keeps generate random request
+    // for allocating/freeing continuous bits.
+    // this may trigger some assertion failure.
+
+// number of ranges
+#define NRG 64
+// number of operations
+#define NOP 1000000L
+    static struct range rgs[NRG];
+    // operation code(1: free, 0, 2: alloc)
+    unsigned op;
+    // # bits to be allocated
+    unsigned bits;
+    // position
+    unsigned pos;
+
+#define bitmap_test_multiple(p, val)                   \
+    do {                                               \
+        st = (long)rgs[p].start;                       \
+        for (long j = 0; j < (long)rgs[p].size; j++) { \
+            if (val) {                                 \
+                ASSERT(bitmap_get(bm, st + j));        \
+            } else {                                   \
+                ASSERT(!bitmap_get(bm, st + j));       \
+            }                                          \
+        }                                              \
+    } while (0)
+
+#define find_range(val)                      \
+    do {                                     \
+        pos = NRG;                           \
+        for (unsigned t = 0; t < pos; t++) { \
+            if (rgs[t].valid == val) {       \
+                pos = t;                     \
+            }                                \
+        }                                    \
+    } while (0)
+
+#define not_found     \
+    if (pos == NRG) { \
+        continue;     \
+    }
+
+    for (long c = 0; c < NOP; c++) {
+        op = rand() % 3;
+        bits = rand() % 255 + 1;
+
+        if (op == 1) {
+            // find and free a slot
+            find_range(1);
+
+            // no available slot
+            not_found
+
+                    // free and test-free.
+                    long st = (long)rgs[pos].start;
+            bitmap_free(bm, st, rgs[pos].size);
+            bitmap_test_multiple(pos, 0);
+
+            // clear valid bit
+            rgs[pos].valid = 0;
+        } else {
+            // find and fill a slot
+            find_range(0);
+
+            // no available slot
+            not_found
+
+                    // allocate and check.
+                    rgs[pos]
+                            .start = (void *)bitmap_alloc(bm, bits);
+            long st = (long)rgs[pos].start;
+            if (st != BITMAP_ERROR) {
+                // set valid bit
+                rgs[pos].valid = 1;
+                rgs[pos].size = bits;
+
+                // check intersection
+                int ret = rg_find((struct range *)rgs, &rgs[pos], NRG);
+                if (ret != RG_ERR) {
+                    LOG("Fatal error: intersection detected");
+                    for (;;)
+                        ;
+                }
+                // check bits
+                bitmap_test_multiple(pos, 1);
+            }
+        }
+    }
+
+    // free all bits
+    for (int i = 0; i < NRG; i++) {
+        if (rgs[i].valid) {
+            long st = (long)rgs[i].start;
+
+            // free and test-free.
+            bitmap_free(bm, st, rgs[i].size);
+            bitmap_test_multiple(i, 0);
+
+            // clear valid bit
+            rgs[i].valid = 0;
+        }
     }
 
     // ok.

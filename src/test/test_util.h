@@ -14,7 +14,7 @@
 
 #define LOG(fmt, ...)                                                  \
     printk("%s:%d In %s: " fmt "\n", __FILE__, __LINE__, __FUNCTION__, \
-           ##__VA_ARGS_)
+           ##__VA_ARGS__)
 
 // test cases
 typedef void testfn(void);
