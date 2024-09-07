@@ -118,7 +118,8 @@ static inline void *next_fptr(void *fptr)
 
 static inline void *fptr2addr(void *fptr)
 {
-    return *(void **)(fptr + 0x8);
+    void *ret = *(void **)(fptr + 0x8);
+    return ret == NULL ? ret : ret - 0x4;
 }
 
 static inline void print_ub(uint8_t ub)
