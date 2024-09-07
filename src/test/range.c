@@ -24,7 +24,7 @@ int rg_safe(struct range *rpt, int begin, int end)
 int rg_find(struct range *rarr, struct range *ro, int size)
 {
     for (int i = 0; i < size; i++) {
-        if (rarr[i].valid && rg_intersect(ro, &rarr[i])) {
+        if (rarr[i].valid && rarr + i != ro && rg_intersect(ro, &rarr[i])) {
             // intersection detected! probably a bug!
             return i;
         }
