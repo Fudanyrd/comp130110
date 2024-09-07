@@ -30,15 +30,16 @@
 #ifdef ASSERT
 #undef ASSERT
 // assertion
-#define ASSERT(cond)                                        \
-    do {                                                    \
-        if (!(cond)) {                                      \
-            printk("Assertion failure: " #cond              \
-                   " at [File %s] [Function %s] [Line %d]", \
-                   __FILE__, __FUNCTION__, __LINE__);       \
-            for (;;) {                                      \
-            }                                               \
-        }                                                   \
+#define ASSERT(cond)                                          \
+    do {                                                      \
+        if (!(cond)) {                                        \
+            printk("Assertion failure: " #cond                \
+                   " at [File %s] [Function %s] [Line %d]\n", \
+                   __FILE__, __FUNCTION__, __LINE__);         \
+            backtrace();                                      \
+            for (;;) {                                        \
+            }                                                 \
+        }                                                     \
     } while (0)
 #endif
 
