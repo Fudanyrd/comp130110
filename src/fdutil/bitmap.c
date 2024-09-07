@@ -67,13 +67,14 @@ void bitmap_init(struct bitmap *bm, long bits, void *buf)
 
 int bitmap_get(struct bitmap *bm, long pos)
 {
-    ASSERT(bm != NULL && bm->bits < pos);
+    ASSERT(bm != NULL && bm->bits >= pos && pos >= 0);
     return BITMAP_GET(bm, pos);
 }
 
 long bitmap_alloc(struct bitmap *bm, long n)
 {
     ASSERT(bm != NULL);
+    ASSERT(n > 0);
     /* Should fail even if just enough space can be allocated. */
     if (n >= bm->bits) {
         return BITMAP_ERROR;
@@ -86,16 +87,19 @@ long bitmap_alloc(struct bitmap *bm, long n)
      * I check whether there's bits colored 1. If so,
      * the inner loop shall terminate.
      */
-    for (long i = 0; i + n < bm->bits; i++) {
+    for (long i = 0; i + n <= bm->bits; ) {
         k = i;
         for (; k < bm->bits; k++) {
-            if (BITMAP_GET(bm, k)) {
+            if (BITMAP_GET(bm, k) || k == i + n) {
                 break;
             }
         }
 
         if (k - n >= i) {
             ASSERT(k - n == i);
+            for (long j = i; j < k; j++) {
+                bitmap_set(bm, j, 1);
+            }
             return i;
         }
         i = k + 1;
@@ -111,7 +115,7 @@ void bitmap_free(struct bitmap *bm, long st, long n)
 
     // n is now end point.
     n += st;
-    ASSERT(n < bm->bits);
+    ASSERT(n <= bm->bits);
 
     // mark all bits as zero.
     for (long i = st; i < n; i++) {
