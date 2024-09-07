@@ -5,6 +5,12 @@
 
 static char buf[256];
 
+/** bitmap stress test: allocate bits of same number and frees.
+ * @param bm a free bitmap, i.e. no bits allocated
+ * @param batch number of bits allocated each time.
+ */
+static void stress_tester(struct bitmap *bm, long batch);
+
 void bitmap_test(void) {
     TEST_START;
 
@@ -47,6 +53,61 @@ void bitmap_test(void) {
         ASSERT(!bitmap_get(&bm, ba));
     }
 
+    // now run stress tests
+    stress_tester(&bm, 2);
+    stress_tester(&bm, 4);
+    stress_tester(&bm, 8);
+    stress_tester(&bm, 64);
+    stress_tester(&bm, 256);
+
+    // some weired number of bits
+    // can your impl handle correctly?
+    stress_tester(&bm, 3);
+    stress_tester(&bm, 5);
+    stress_tester(&bm, 7);
+    stress_tester(&bm, 11);
+    stress_tester(&bm, 13);
+    stress_tester(&bm, 17);
+    stress_tester(&bm, 23);
+    stress_tester(&bm, 26);
+
     // OK
     TEST_END;
+}
+
+static void stress_tester(struct bitmap *bm, long batch) {
+    const long bits = bm->bits;
+
+    // allocate all bits
+    long ba = 0;  // allocated bits
+    long p;
+    while ((p = bitmap_alloc(bm, batch)) != BITMAP_ERROR) {
+        ba++;
+
+        // check that bits are correctly set.
+        // note that p is the start of allocated bits.
+        for (long i = 0; i < batch; i++) {
+            ASSERT(bitmap_get(bm, p + i));
+        }
+    }
+
+    // check that all bits is allocated
+    // if a single bit is allocated more than once,
+    // ba will (probably) not equal to bits / batch.
+    ASSERT(ba == bits / batch);
+
+    // now free all stuff.
+    // by allocation algorithm, bit is allocated from
+    // start to end.
+    p = 0;
+    for (long i = 0; i < bits / batch; i++) {
+        bitmap_free(bm, p, batch);
+        // check that bits are correctly set.
+        for (long i = 0; i < batch; i++) {
+            ASSERT(!bitmap_get(bm, p + i));
+        }
+        p += batch;
+    }
+
+    // ok.
 }
