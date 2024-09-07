@@ -11,12 +11,13 @@ static char buf[256];
  */
 static void stress_tester(struct bitmap *bm, long batch);
 
-void bitmap_test(void) {
+void bitmap_test(void)
+{
     TEST_START;
 
     // initialize the bitmap
     struct bitmap bm;
-    const long bits = sizeof(buf) * 0x8; 
+    const long bits = sizeof(buf) * 0x8;
     bitmap_init(&bm, bits, (void *)buf);
     ASSERT(Memchk((const unsigned char *)buf, sizeof(buf), 0x0));
 
@@ -25,7 +26,7 @@ void bitmap_test(void) {
     ASSERT(bitmap_alloc(&bm, bits * 2) == BITMAP_ERROR);
 
     // allocate all bits
-    long ba = 0;  // allocated bits
+    long ba = 0; // allocated bits
     long p;
     while ((p = bitmap_alloc(&bm, 1)) != BITMAP_ERROR) {
         ba++;
@@ -75,11 +76,12 @@ void bitmap_test(void) {
     TEST_END;
 }
 
-static void stress_tester(struct bitmap *bm, long batch) {
+static void stress_tester(struct bitmap *bm, long batch)
+{
     const long bits = bm->bits;
 
     // allocate all bits
-    long ba = 0;  // allocated bits
+    long ba = 0; // allocated bits
     long p;
     while ((p = bitmap_alloc(bm, batch)) != BITMAP_ERROR) {
         ba++;

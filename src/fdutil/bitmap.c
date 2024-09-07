@@ -87,7 +87,7 @@ long bitmap_alloc(struct bitmap *bm, long n)
      * I check whether there's bits colored 1. If so,
      * the inner loop shall terminate.
      */
-    for (long i = 0; i + n <= bm->bits; ) {
+    for (long i = 0; i + n <= bm->bits;) {
         k = i;
         for (; k < bm->bits; k++) {
             if (BITMAP_GET(bm, k) || k == i + n) {

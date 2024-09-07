@@ -8,9 +8,13 @@
         if (succ) {                  \
             printk("TEST PASSED\n"); \
         } else {                     \
-            printk("TEST FAILED\n");  \
+            printk("TEST FAILED\n"); \
         }                            \
     } while (0)
+
+#define LOG(fmt, ...)                                                  \
+    printk("%s:%d In %s: " fmt "\n", __FILE__, __LINE__, __FUNCTION__, \
+           ##__VA_ARGS_)
 
 // test cases
 typedef void testfn(void);
