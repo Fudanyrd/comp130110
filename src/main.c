@@ -5,6 +5,7 @@
 #include <common/string.h>
 #include <common/debug.h>
 #include <test/test_util.h>
+#include <test/test.h>
 
 static volatile bool boot_secondary_cpus = false;
 
@@ -53,6 +54,8 @@ void main()
 
         arch_fence();
 
+        // start running test
+        run_test();
         // Set a flag indicating that the secondary CPUs can start executing.
         boot_secondary_cpus = true;
     } else {

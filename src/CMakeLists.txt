@@ -42,6 +42,41 @@ set(kernel_name kernel8)
 add_executable(${kernel_name}.elf main.c start.S)
 target_link_libraries(${kernel_name}.elf test kernelx driver common aarch64 fdutil)
 
+# tests, do not mix up every test cases into kernel
+set(testlib test_util kernelx driver common aarch64 fdutil)
+set(kmain main.c start.S)
+
+foreach(tcase IN LISTS tcases)
+    set(prefix "${CMAKE_CURRENT_BINARY_DIR}/${tcase}")
+    set(elf "${prefix}-test.elf")
+    set(asm "${prefix}.asm")
+    set(hdr "${prefix}.hdr")
+    set(img "${prefix}.img")
+    message(STATUS "Adding ${elf}")
+    add_executable("${tcase}-test.elf" "${kmain}")
+    target_link_libraries("${tcase}-test.elf" "${tcase}_test;${testlib}")
+    # mischalleous items
+    add_custom_command(
+        OUTPUT "${asm}"
+        COMMAND ${aarch64_objdump} -S -d ${elf} > ${asm}
+        DEPENDS ${elf})
+    add_custom_command(
+        OUTPUT ${hdr}
+        COMMAND ${aarch64_objdump} -x ${elf} > ${hdr}
+        DEPENDS ${elf})
+    add_custom_command(
+        OUTPUT ${img}
+        COMMAND ${aarch64_objcopy} -O binary ${elf} ${img}
+        DEPENDS ${elf})
+endforeach()
+
+# DO NOT USE REPETITIVE CODE(@Fudanyrd)
+#add_executable(foo-test.elf ${kmain})  # foo test
+#target_link_libraries(foo-test.elf ${testlib} foo_test)
+# ... a lot more
+#add_executable(bar-test.elf ${kmain})  # bar test
+#target_link_libraries(bar-test.elf "${testlib} bar_test")
+
 set(kernel_prefix "${CMAKE_CURRENT_BINARY_DIR}/${kernel_name}")
 set(kernel_elf "${kernel_prefix}.elf")
 set(kernel_asm "${kernel_prefix}.asm")

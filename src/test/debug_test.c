@@ -30,3 +30,8 @@ static void baz(void)
     //
     backtrace();
 }
+
+// now run debug test.
+void run_test(void) {
+    debug_test();
+}
