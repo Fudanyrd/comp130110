@@ -89,3 +89,20 @@ add_custom_target(debug
 # add_custom_target(libc
 # 	COMMAND make -C ../libc -j12 &&
 # 	sed -e \"s/\\/usr\\/local\\/musl/..\\/..\\/..\\/libc/g\" ${LIBC_SPEC} > ${LIBC_SPEC_OUT})
+
+foreach(tcase IN LISTS tcases)
+    get_property(elf GLOBAL PROPERTY ${tcase}_elf_path)
+    message(STATUS "Adding custom target for ${tcase}")
+    add_custom_target("${tcase}-test"
+    COMMAND ${aarch64_qemu}
+        -machine virt,gic-version=3
+        -cpu cortex-a72
+        -smp 1
+        -m 4096
+        -nographic
+        -monitor none
+        -serial "mon:stdio"
+        -global virtio-mmio.force-legacy=false
+        -kernel ${elf}
+    )
+endforeach()

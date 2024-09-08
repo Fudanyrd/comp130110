@@ -68,6 +68,8 @@ foreach(tcase IN LISTS tcases)
         OUTPUT ${img}
         COMMAND ${aarch64_objcopy} -O binary ${elf} ${img}
         DEPENDS ${elf})
+    set_property(GLOBAL PROPERTY ${tcase}_elf_path ${elf})
+    set_property(GLOBAL PROPERTY ${tcase}_image_path ${img})
 endforeach()
 
 # DO NOT USE REPETITIVE CODE(@Fudanyrd)
