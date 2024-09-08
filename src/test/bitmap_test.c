@@ -234,6 +234,7 @@ static void adhoc_tester(struct bitmap *bm)
 }
 
 // now run bitmap test.
-void run_test(void) {
+void run_test(void)
+{
     bitmap_test();
 }

@@ -32,6 +32,7 @@ static void baz(void)
 }
 
 // now run debug test.
-void run_test(void) {
+void run_test(void)
+{
     debug_test();
 }
