@@ -1,8 +1,8 @@
-#include "debug.h"
 #include <common/defines.h>
+#include "debug.h"
 
-typedef unsigned char uint8_t;
-typedef unsigned long size_t;
+#include <fdutil/stdint.h>
+#include <fdutil/stddef.h>
 
 void debug_init(void)
 {
@@ -10,6 +10,8 @@ void debug_init(void)
     STATIC_ASSERT(sizeof(int) == 4);
     STATIC_ASSERT(sizeof(unsigned long) == 8);
     STATIC_ASSERT(sizeof(void *) == 8);
+    STATIC_ASSERT(sizeof(size_t) == 8);
+    STATIC_ASSERT(sizeof(ptrdiff_t) == 8);
 
     // it is still highly recommended NOT to make any
     // assumptions about the ISA.

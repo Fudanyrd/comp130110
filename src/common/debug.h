@@ -29,6 +29,8 @@
 
 #ifdef ASSERT
 #undef ASSERT
+#endif
+
 // assertion
 #define ASSERT(cond)                                          \
     do {                                                      \
@@ -41,7 +43,6 @@
             }                                                 \
         }                                                     \
     } while (0)
-#endif
 
 #define STATIC_ASSERT(cond) \
     do {                    \
