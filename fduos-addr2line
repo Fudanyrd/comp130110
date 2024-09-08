@@ -3,14 +3,23 @@ import os
 import sys
 
 args = sys.argv
+
+if len(args) < 3:
+    print("usage fduos-addr2line <kernel> <addresses>")
+    exit()
+
+kernel = args[1]
+if not os.path.exists(kernel):
+    print(f'kernel image {kernel} not found.')
+    exit()
+
 args.reverse()
-args = args[:-1]
+args = args[:-2]
 tools = [
     '/usr/bin/addr2line', 
     '/usr/bin/aarch64-linux-gnu-addr2line'
 ]
 tool = None
-kernel = './build/src/kernel8.elf'
 
 # find addr2line
 for t in tools:
