@@ -32,9 +32,9 @@
 #define __FDUTIL_STDDEF_
 
 #ifndef NULL
-#define NULL ((void *) 0)
+#define NULL ((void *)0)
 #endif // NULL
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *) 0)->MEMBER)
+#define offsetof(TYPE, MEMBER) ((size_t) & ((TYPE *)0)->MEMBER)
 
 /** GCC predefines the types we need for ptrdiff_t and size_t,
    so that we don't have to guess. */

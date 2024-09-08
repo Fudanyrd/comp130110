@@ -104,5 +104,5 @@ foreach(tcase IN LISTS tcases)
         -serial "mon:stdio"
         -global virtio-mmio.force-legacy=false
         -kernel ${elf}
-    )
+    DEPENDS "${elf}")
 endforeach()
