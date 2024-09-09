@@ -1,3 +1,6 @@
+# @Fudanyrd
+# Please Follow the instruction in README.md to add a new test.
+
 # I don't want to mix all test cases into kernel.
 # this will make kernel.elf too large and is problematic.
 

@@ -75,5 +75,8 @@ static void lst_test(void)
 
 void run_test(void)
 {
-    lst_test();
+    // this is a single core test,
+    // i.e. not concurrent
+    if (cpuid() == 0)
+        lst_test();
 }

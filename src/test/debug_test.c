@@ -1,4 +1,5 @@
 #include "test.h"
+#include "test_util.h"
 #include <common/debug.h>
 
 static void foo(void);
@@ -34,5 +35,8 @@ static void baz(void)
 // now run debug test.
 void run_test(void)
 {
-    debug_test();
+    // this is a single core test,
+    // i.e. not concurrent
+    if (cpuid() == 0)
+        debug_test();
 }

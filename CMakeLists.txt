@@ -90,10 +90,25 @@ add_custom_target(debug
 # 	COMMAND make -C ../libc -j12 &&
 # 	sed -e \"s/\\/usr\\/local\\/musl/..\\/..\\/..\\/libc/g\" ${LIBC_SPEC} > ${LIBC_SPEC_OUT})
 
+# @Fudanyrd
+# if you want to run your foo test, run: `make foo-test` in build dir.
+# if you want to debug your foo test, run: `make foo-test-gdb`.
 foreach(tcase IN LISTS tcases)
     get_property(elf GLOBAL PROPERTY ${tcase}_elf_path)
     message(STATUS "Adding custom target for ${tcase}")
     add_custom_target("${tcase}-test"
+    COMMAND ${aarch64_qemu}
+        -machine virt,gic-version=3
+        -cpu cortex-a72
+        -smp 4
+        -m 4096
+        -nographic
+        -monitor none
+        -serial "mon:stdio"
+        -global virtio-mmio.force-legacy=false
+        -kernel ${elf}
+    DEPENDS "${elf}")
+    add_custom_target("${tcase}-test-gdb"
     COMMAND ${aarch64_qemu}
         -machine virt,gic-version=3
         -cpu cortex-a72
@@ -104,5 +119,6 @@ foreach(tcase IN LISTS tcases)
         -serial "mon:stdio"
         -global virtio-mmio.force-legacy=false
         -kernel ${elf}
-    DEPENDS "${elf}")
+        -gdb tcp::1234 -S
+   DEPENDS "${elf}")
 endforeach()

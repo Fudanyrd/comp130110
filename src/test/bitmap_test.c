@@ -236,5 +236,8 @@ static void adhoc_tester(struct bitmap *bm)
 // now run bitmap test.
 void run_test(void)
 {
-    bitmap_test();
+    // this is a single core test,
+    // i.e. not concurrent
+    if (cpuid() == 0)
+        bitmap_test();
 }

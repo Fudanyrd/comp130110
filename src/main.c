@@ -54,10 +54,10 @@ void main()
 
         arch_fence();
 
-        // start running test
-        run_test();
         // Set a flag indicating that the secondary CPUs can start executing.
         boot_secondary_cpus = true;
+        // start running test
+        run_test();
     } else {
         while (!boot_secondary_cpus)
             ;
@@ -66,6 +66,8 @@ void main()
         /* @todo: Print "Hello, world! (Core <core id>)" */
         HELLO((int)cpuid());
         /* @end todo */
+        // start running test
+        run_test();
     }
 
     set_return_addr(idle_entry);

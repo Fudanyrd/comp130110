@@ -1,6 +1,7 @@
 #pragma once
 
 #include <kernel/printk.h>
+#include <aarch64/intrinsic.h>
 
 #define TEST_START int succ = 1
 #define TEST_END                     \
