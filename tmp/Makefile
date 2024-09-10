@@ -7,6 +7,9 @@ all: sh
 sh: $(sh_objs)
 	$(CC) $(sh_objs) -o sh
 
+args: args.c
+	$(CC) -g args.c -o args
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 

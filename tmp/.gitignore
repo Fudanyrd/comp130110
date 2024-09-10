@@ -1,3 +1,5 @@
+# binaries
 sh
+args
 *.o
 .gdbinit
