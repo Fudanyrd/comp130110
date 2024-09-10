@@ -58,7 +58,7 @@ void bitmap_init(struct bitmap *bm, long bits, void *buf)
     bm->bits = bits;
     bm->buf = buf;
 
-    const unsigned long bufsz = ROUND_UP(bits, BITS_PER_ELEM);
+    const unsigned long bufsz = ROUND_UP(bits, BITS_PER_ELEM) / BITS_PER_ELEM;
     // zero out the buffer.
     for (unsigned long i = 0; i < bufsz; i++) {
         bm->buf[i] = 0x0;
