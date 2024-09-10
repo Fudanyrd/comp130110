@@ -44,7 +44,7 @@ target_link_libraries(${kernel_name}.elf test kernelx driver common aarch64 fdut
 
 # tests, do not mix up every test cases into kernel
 set(testlib test_util kernelx driver common aarch64 fdutil)
-set(kmain main.c start.S)
+set(kmain test_main.c start.S)
 
 foreach(tcase IN LISTS tcases)
     set(prefix "${CMAKE_CURRENT_BINARY_DIR}/${tcase}")
