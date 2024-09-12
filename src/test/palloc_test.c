@@ -47,3 +47,7 @@ void run_test(void)
 {
     palloc_test();
 }
+
+void test_init(void)
+{
+}
