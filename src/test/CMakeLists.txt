@@ -9,6 +9,7 @@
 set(test_util_src
     rand.c
     range.c
+    sync.c
 )
 add_library(test_util STATIC ${test_util_src})
 # make test a fake lib which does not run any test in reality.
@@ -16,7 +17,10 @@ add_library(test STATIC "${test_util_src};void.c")
 
 # test cases
 # Hint: (use semicolon to separate; do NOT add whitespaces)
-set(tcases "debug;bitmap;lst;palloc" CACHE STRING "")
+# Lab 0: Boot
+# set(tcases "debug;bitmap;lst;" CACHE STRING "")
+# Lab 1: malloc
+set(tcases "palloc;malloc;alloc2023" CACHE STRING "")
 
 # add all of your test cases here.
 # and build a library for it.
