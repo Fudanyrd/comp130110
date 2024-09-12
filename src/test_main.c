@@ -5,6 +5,7 @@
 #include <kernel/core.h>
 #include <common/string.h>
 #include <common/debug.h>
+#include <fdutil/malloc.h>
 #include <fdutil/palloc.h>
 #include <test/test_util.h>
 #include <test/test.h>
@@ -60,12 +61,14 @@ void main()
         shut_init();
         shut_record();
         palloc_init();
+        malloc_init();
 
         arch_fence();
 
         // Set a flag indicating that the secondary CPUs can start executing.
         boot_secondary_cpus = true;
         // start running test
+        test_init();
         run_test();
     } else {
         while (!boot_secondary_cpus)
