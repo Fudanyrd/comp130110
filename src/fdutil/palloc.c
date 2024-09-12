@@ -21,7 +21,9 @@ struct pallocator {
     size_t npage; /* number of pages */
     void *start; /* Start address */
     void *end; /* End address */
-} allocators[NCPU];
+};
+
+static struct pallocator allocators[NCPU];
 
 /** Check for heap buffer overflow */
 #define CHECK_PA(pa)                                       \
