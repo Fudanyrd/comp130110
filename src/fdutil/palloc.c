@@ -13,6 +13,7 @@ struct page {
 /** Page allocator(O(1) for all operations) */
 struct pallocator {
     struct page *frepg; /* pointer to free page. */
+    size_t nalloc;  /* Number of allocated pages(debug, test) */
     SpinLock lock; /* lock */
 
     /**< Immutable members(don't acquire lock) */
@@ -79,6 +80,17 @@ void *palloc_get(void)
     return pallocator_get(&allocators[cpu]);
 }
 
+size_t palloc_used(void)
+{
+    size_t n = 0;
+    for (int i = 0; i < NCPU; i++) {
+        acquire_spinlock(&allocators[i].lock);
+        n += allocators[i].nalloc;
+        release_spinlock(&allocators[i].lock);
+    }
+    return n;
+}
+
 void palloc_free(void *pg)
 {
     // it is NOT safe to use cpuid() to index into
@@ -110,6 +122,7 @@ void pallocator_init(struct pallocator *pa, void *start, size_t npage)
     pa->start = start;
     pa->end = start + (npage * PGSIZE);
     pa->npage = npage;
+    pa->nalloc = 0;
     init_spinlock(&pa->lock);
 
     // initially no free page.
@@ -118,6 +131,7 @@ void pallocator_init(struct pallocator *pa, void *start, size_t npage)
     // put all pages onto free list.
     void *pg = start;
     for (size_t i = 0; i < npage; i++) {
+        pa->nalloc++;
         pallocator_free(pa, pg);
         pg += PGSIZE;
     }
@@ -141,6 +155,7 @@ void *pallocator_get(struct pallocator *pa)
     // extract the first free page
     void *ret = pa->frepg;
     pa->frepg = pa->frepg->nxt;
+    pa->nalloc++;
 
     // return
     release_spinlock(&pa->lock);
@@ -168,6 +183,8 @@ void pallocator_free(struct pallocator *pa, void *pg)
     struct page *p = pg;
     p->nxt = pa->frepg;
     pa->frepg = p;
+    ASSERT(pa->nalloc > 0);
+    pa->nalloc--;
 
     // release the lock, done.
     release_spinlock(&pa->lock);

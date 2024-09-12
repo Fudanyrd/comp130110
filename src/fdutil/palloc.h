@@ -37,6 +37,9 @@ void *palloc_get(void);
 /** Free a page. */
 void palloc_free(void *pg);
 
+/** Currently number of pages allocated. */
+size_t palloc_used(void);
+
 /** Interface of an page allocator */
 struct palloc_intf {
     void *(*get)(unsigned int); // get a single page
