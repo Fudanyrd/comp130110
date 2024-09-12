@@ -41,7 +41,7 @@ typedef unsigned long long u64;
 
 #define PTE_HIGH_NX (1LL << 54)
 
-#define KSPACE_MASK 0xffff000000000000
+#define KSPACE_MASK 0xFFFF000000000000
 
 // convert kernel address into physical address.
 #define K2P(addr) ((u64)(addr) - (KSPACE_MASK))

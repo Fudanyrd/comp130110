@@ -3,6 +3,10 @@
 #include "lst.h"
 #include <common/spinlock.h>
 #include <common/string.h>
+#include <common/rc.h>
+
+/** For testing */
+extern RefCount kalloc_page_cnt;
 
 /** A descriptor */
 struct desc {
@@ -128,6 +132,7 @@ static void add_blocks(struct desc *d)
 {
     ASSERT(d != NULL);
     void *pg = palloc_get();
+    increment_rc(&kalloc_page_cnt);
     ASSERT(pg != NULL);
 
     /* Build an arena */
@@ -181,4 +186,5 @@ static void arena_free(struct arena *a)
     }
 
     palloc_free(a);
+    decrement_rc(&kalloc_page_cnt);
 }

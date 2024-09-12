@@ -13,7 +13,7 @@ set(test_util_src
 )
 add_library(test_util STATIC ${test_util_src})
 # make test a fake lib which does not run any test in reality.
-add_library(test STATIC "${test_util_src};void.c")
+add_library(test STATIC "${test_util_src};kalloc_test.c")
 
 # test cases
 # Hint: (use semicolon to separate; do NOT add whitespaces)
