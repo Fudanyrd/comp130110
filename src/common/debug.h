@@ -44,6 +44,20 @@
         }                                                     \
     } while (0)
 
+#ifdef PANIC
+#undef PANIC
+#endif
+
+// kernel panic(will hang)
+#define PANIC(fmt, ...)                                                     \
+    do {                                                                    \
+        printk("Kernel panic at [%s:%d] %s: " fmt "\n", __FILE__, __LINE__, \
+               __FUNCTION__, ##__VA_ARGS__);                                \
+        backtrace();                                                        \
+        for (;;)                                                            \
+            ;                                                               \
+    } while (0)
+
 #define STATIC_ASSERT(cond) \
     do {                    \
         switch (0) {        \

@@ -5,6 +5,7 @@
 #include <kernel/core.h>
 #include <common/string.h>
 #include <common/debug.h>
+#include <fdutil/palloc.h>
 #include <test/test_util.h>
 #include <test/test.h>
 
@@ -58,6 +59,7 @@ void main()
         // boot shutdown module
         shut_init();
         shut_record();
+        palloc_init();
 
         arch_fence();
 
@@ -75,7 +77,7 @@ void main()
         run_test();
     }
 
-    // shutdown the cpu, this will call 
+    // shutdown the cpu, this will call
     shutdown();
     set_return_addr(idle_entry);
 }

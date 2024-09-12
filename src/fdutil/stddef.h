@@ -31,6 +31,9 @@
 #ifndef __FDUTIL_STDDEF_
 #define __FDUTIL_STDDEF_
 
+/** Maximum CPUs */
+#define NCPU 4
+
 #ifndef NULL
 #define NULL ((void *)0)
 #endif // NULL

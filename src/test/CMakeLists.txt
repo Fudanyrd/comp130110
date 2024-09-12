@@ -16,7 +16,7 @@ add_library(test STATIC "${test_util_src};void.c")
 
 # test cases
 # Hint: (use semicolon to separate; do NOT add whitespaces)
-set(tcases "debug;bitmap;lst" CACHE STRING "")
+set(tcases "debug;bitmap;lst;palloc" CACHE STRING "")
 
 # add all of your test cases here.
 # and build a library for it.
