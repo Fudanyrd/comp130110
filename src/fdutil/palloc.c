@@ -88,6 +88,10 @@ void palloc_free(void *pg)
     // However, this is true only if we implemented the
     // page stealing mechanism.
 
+    if (pg == NULL) {
+        return;
+    }
+
     for (int i = 0; i < NCPU; i++) {
         if (allocators[i].start <= pg && allocators[i].end > pg) {
             pallocator_free(&allocators[i], pg);

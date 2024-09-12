@@ -34,6 +34,10 @@ static void palloc_test(void)
     for (int i = 0; i < NALLOC; i++) {
         palloc_free(pages[cpu * NALLOC + i]);
     }
+
+    // free null pointer.
+    palloc_free(NULL);
+
     if (cpu == 0) {
         TEST_END;
     }
