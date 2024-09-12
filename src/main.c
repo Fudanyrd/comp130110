@@ -9,7 +9,8 @@
 
 static volatile bool boot_secondary_cpus = false;
 
-void main() {
+void main()
+{
     if (cpuid() == 0) {
         /* @todo: Clear BSS section.*/
         extern char edata[], end[];
@@ -28,7 +29,8 @@ void main() {
         // Set a flag indicating that the secondary CPUs can start executing.
         boot_secondary_cpus = true;
     } else {
-        while (!boot_secondary_cpus);
+        while (!boot_secondary_cpus)
+            ;
         arch_fence();
     }
 
