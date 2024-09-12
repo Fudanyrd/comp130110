@@ -2,6 +2,8 @@
 
 #define RAND_MAX 32768
 
+void test_init();
+
 void alloc_test();
 unsigned rand();
 void srand(unsigned seed);
