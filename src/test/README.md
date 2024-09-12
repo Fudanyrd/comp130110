@@ -3,6 +3,7 @@
 <ol>
     <li>add the declaration in test_util.h;</li>
     <li>add a source file named foo_test.c;</li>
+    <li>In foo_test.c, implement run_test and test_init function. </li>
     <li>add this to src/test/CMakeLists(as shown below) </li>
     <li> build foo-test.elf and run. </li>
 </ol>

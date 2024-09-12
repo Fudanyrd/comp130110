@@ -10,6 +10,12 @@ bitmap
 lst
 ```
 
+List of thread-safe utilities:
+<ul>
+    <li>malloc</li>
+    <li>palloc</li>
+</ul>
+
 # Author
 Rundong Yang(22307140045@m.fudan.edu.cn)
 pintos operating system project of Peking University
