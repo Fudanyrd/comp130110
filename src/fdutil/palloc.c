@@ -2,6 +2,7 @@
 #include "stddef.h"
 #include <common/debug.h>
 #include <common/spinlock.h>
+#include <common/string.h>
 #include <driver/memlayout.h>
 #include <driver/base.h>
 
@@ -13,7 +14,7 @@ struct page {
 /** Page allocator(O(1) for all operations) */
 struct pallocator {
     struct page *frepg; /* pointer to free page. */
-    size_t nalloc;  /* Number of allocated pages(debug, test) */
+    size_t nalloc; /* Number of allocated pages(debug, test) */
     SpinLock lock; /* lock */
 
     /**< Immutable members(don't acquire lock) */
@@ -176,6 +177,8 @@ void pallocator_free(struct pallocator *pa, void *pg)
     }
     ASSERT(pg_off(pg) == 0);
     ASSERT(pg >= pa->start && pg < pa->end);
+    // fill with junks, to detect use-after-free.
+    memset(pg, 0xcc, PGSIZE);
 
     // take the lock
     acquire_spinlock(&pa->lock);

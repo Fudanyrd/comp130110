@@ -2,6 +2,7 @@
 #include "stdint.h"
 #include "lst.h"
 #include <common/spinlock.h>
+#include <common/string.h>
 
 /** A descriptor */
 struct desc {
@@ -28,6 +29,9 @@ struct arena {
 /** Returns the arena managing the blk. */
 static inline struct arena *block2arena(void *blk);
 
+/** Free the space of an arena */
+static void arena_free(struct arena *a);
+
 static struct desc descs[NDESC];
 
 /** Arena magic number */
@@ -53,6 +57,10 @@ void malloc_init(void)
 
 void *malloc(size_t nb)
 {
+    if (nb == 0) {
+        // zero-sized buffer
+        return NULL;
+    }
     // round nb up to power of 2.
     struct desc *d = NULL;
     void *ret;
@@ -90,6 +98,30 @@ void *malloc(size_t nb)
 /** Currently free does nothing. */
 void free(void *pt __attribute__((unused)))
 {
+    if (pt == NULL) {
+        return;
+    }
+
+    // get arena and descriptor
+    struct arena *ar = block2arena(pt);
+    struct desc *d = ar->desc;
+    ASSERT(d != NULL);
+    acquire_spinlock(&d->lock);
+    ASSERT(ar->nfr < d->bpa);
+    ar->nfr++;
+
+    // make it easier to trigger use-after-free
+    memset(pt, 0xcc, d->bsz);
+    list_push_back(&d->flst, (struct list_elem *)pt);
+    if (ar->nfr == d->bpa) {
+        // free the arena.
+        arena_free(ar);
+        ar = NULL;
+    } else {
+        // add the block to its free list.
+        // done.
+    }
+    release_spinlock(&d->lock);
 }
 
 static void add_blocks(struct desc *d)
@@ -120,6 +152,33 @@ static inline struct arena *block2arena(void *blk)
 {
     struct arena *ar = pg_round_down(blk);
     ASSERT(ar != NULL);
-    ASSERT(ar->magic == ARENA_MAGIC);
+    if (ar->magic != ARENA_MAGIC) {
+        PANIC("not an arena");
+    }
     return ar;
+}
+
+static void arena_free(struct arena *a)
+{
+    ASSERT(a != NULL);
+    if (a->magic != ARENA_MAGIC) {
+        PANIC("not an arena");
+    }
+
+    // descriptor
+    struct desc *d = a->desc;
+    ASSERT(a->nfr == d->bpa);
+
+    // remove all blocks
+    void *pg = (void *)a;
+    pg += sizeof(struct arena);
+    struct list_elem *elem;
+    for (uint32_t i = 0; i < d->bpa; i++) {
+        elem = pg;
+        list_remove(elem);
+        // advance.
+        pg += d->bsz;
+    }
+
+    palloc_free(a);
 }
