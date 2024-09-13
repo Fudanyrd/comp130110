@@ -20,7 +20,7 @@ add_library(test STATIC "${test_util_src};kalloc_test.c")
 # Lab 0: Boot
 # set(tcases "debug;bitmap;lst;" CACHE STRING "")
 # Lab 1: malloc
-set(tcases "palloc;malloc;alloc2023" CACHE STRING "")
+set(tcases "palloc;malloc;alloc2023;lab1" CACHE STRING "")
 
 # add all of your test cases here.
 # and build a library for it.
