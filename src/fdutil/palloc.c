@@ -6,6 +6,7 @@
 #include <driver/memlayout.h>
 #include <driver/base.h>
 
+/** Organize pages in singly-linked list. */
 struct page {
     struct page *nxt;
     char fre[0];

@@ -18,6 +18,7 @@ struct desc {
     uint32_t bpa; // blocks per arena
 };
 
+/** Add a page of blocks to descriptor d. */
 static void add_blocks(struct desc *d);
 
 /** Number of descriptors */
@@ -36,6 +37,7 @@ static inline struct arena *block2arena(void *blk);
 /** Free the space of an arena */
 static void arena_free(struct arena *a);
 
+/** Descriptors(private) */
 static struct desc descs[NDESC];
 
 /** Arena magic number */
@@ -59,6 +61,9 @@ void malloc_init(void)
     }
 }
 
+/** Allocate a block of size 2^i, 
+ * where i is the smallest integer satisfying 2^i >= nb.
+ */
 void *malloc(size_t nb)
 {
     if (nb == 0) {
@@ -99,7 +104,7 @@ void *malloc(size_t nb)
     return ret;
 }
 
-/** Currently free does nothing. */
+/** Free a block allocated by malloc. */
 void free(void *pt __attribute__((unused)))
 {
     if (pt == NULL) {
