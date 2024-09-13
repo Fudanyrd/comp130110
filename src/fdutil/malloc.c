@@ -21,15 +21,20 @@ struct desc {
 /** Add a page of blocks to descriptor d. */
 static void add_blocks(struct desc *d);
 
-/** Number of descriptors */
-#define NDESC 8
-
 /** An arena */
 struct arena {
     struct desc *desc; // descriptor
     uint32_t nfr; // number of free block
     uint32_t magic; // magic number
 };
+
+static const int szset[] = { 16,  32,   48,   64,
+                             72,  80,   96,   128,
+                             144, 192,  256,  384,
+                             512, 1024, 2040, PGSIZE - sizeof(struct arena) };
+
+/** Number of descriptors */
+#define NDESC ((int)(sizeof(szset) / sizeof(szset[0])))
 
 /** Returns the arena managing the blk. */
 static inline struct arena *block2arena(void *blk);
@@ -45,19 +50,26 @@ static struct desc descs[NDESC];
 
 void malloc_init(void)
 {
+    STATIC_ASSERT(sizeof(struct arena) % 8 == 0);
     // initialize 8 descriptors, each handles memory
     // block of size:
     // 16, 32, 64, 128, 256
     // 512, 1024, 2048
 
-    uint32_t sz = 16U;
+    uint32_t sz;
     for (int i = 0; i < NDESC; i++) {
+        sz = szset[i];
+        if (sz % 8 != 0) {
+            PANIC("Alignment");
+        }
+        if (sz + sizeof(struct arena) > PGSIZE) {
+            PANIC("overflow");
+        }
         descs[i].bsz = sz;
         descs[i].bpa = (PGSIZE - sizeof(struct arena)) / sz;
         init_spinlock(&descs[i].lock);
         list_init(&descs[i].flst);
         ASSERT(list_empty(&descs[i].flst));
-        sz *= 2;
     }
 }
 
