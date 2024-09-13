@@ -28,10 +28,29 @@ struct arena {
     uint32_t magic; // magic number
 };
 
-static const int szset[] = { 16,  32,   48,   64,
-                             72,  80,   96,   128,
-                             144, 192,  256,  384,
-                             512, 1024, 2040, PGSIZE - sizeof(struct arena) };
+/** Sizes of blocks to reduce page usage */
+static const int szset[] = { 16,
+                             32,
+                             48,
+                             64,
+                             72,
+                             80,
+                             96,
+                             128,
+                             144,
+                             208,
+                             288,
+                             408,
+                             576,
+                             1016,
+                             1360,
+                             2040,
+                             PGSIZE - sizeof(struct arena) };
+
+// note that organizing so many descriptors is error-prone.
+// (No, I don't mean that my descriptor implementation has bug)
+// it is sugguested to change the array to simpler ones, for example,
+// { 16, 32, 64, 128, 256, 512, 1024, 2048 };
 
 /** Number of descriptors */
 #define NDESC ((int)(sizeof(szset) / sizeof(szset[0])))
