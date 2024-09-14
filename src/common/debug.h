@@ -32,16 +32,15 @@
 #endif
 
 // assertion
-#define ASSERT(cond)                                          \
-    do {                                                      \
-        if (!(cond)) {                                        \
-            printk("Assertion failure: " #cond                \
-                   " at [File %s] [Function %s] [Line %d]\n", \
-                   __FILE__, __FUNCTION__, __LINE__);         \
-            backtrace();                                      \
-            for (;;) {                                        \
-            }                                                 \
-        }                                                     \
+#define ASSERT(cond)                                                           \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            printk("Assertion failure at [%s:%d], %s! \n", __FILE__, __LINE__, \
+                   __FUNCTION__);                                              \
+            backtrace();                                                       \
+            for (;;) {                                                         \
+            }                                                                  \
+        }                                                                      \
     } while (0)
 
 #ifdef PANIC
