@@ -42,10 +42,10 @@ size_t palloc_used(void);
 
 /** Interface of an page allocator */
 struct palloc_intf {
-    void *(*get)(unsigned int); // get a single page
-    void *(*free)(void *); // free a single page
+    void *(*get)(); // get a single page
+    void (*free)(void *); // free a single page
     void *(*getmult)(unsigned int); // get multiple pages(optional)
-    void *(*freemult)(void *, unsigned int); // free multiple(optional)
+    void (*freemult)(void *, unsigned int); // free multiple(optional)
 };
 
 #endif // __FDUTIL_PALLOC_
