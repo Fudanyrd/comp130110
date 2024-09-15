@@ -21,4 +21,10 @@ void shut_init(void);
 /** Record a running cpu. */
 void shut_record(void);
 
+/** Returns number of all cpu(s). */
+int ncpu_all();
+
+/** Returns number of working cpu(s) */
+int ncpu_run();
+
 #endif // __KERNEL_SHUTDOWN_

@@ -3,11 +3,10 @@
 #include <common/spinlock.h>
 #include <common/rc.h>
 #include <common/debug.h>
+#include <kernel/shutdown.h>
 #include <aarch64/intrinsic.h>
 
 static RefCount counter;
-// defined in test_main.
-extern RefCount ncpu;
 
 void sync_init(void)
 {
@@ -20,8 +19,8 @@ void sync(size_t cnt)
     increment_rc(&counter);
 
     for (;;) {
-        ASSERT((size_t)counter.count <= cnt * NCPU);
-        if ((size_t)counter.count == cnt * NCPU) {
+        ASSERT((size_t)counter.count <= cnt * ncpu_all());
+        if ((size_t)counter.count == cnt * ncpu_all()) {
             break;
         }
     }

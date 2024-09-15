@@ -16,6 +16,7 @@
 #include "sync.h"
 #include <common/debug.h>
 #include <fdutil/palloc.h>
+#include <kernel/shutdown.h>
 
 /** Each cpu allocate this many pages */
 #define CPUPG 1024
@@ -36,7 +37,7 @@ void run_test()
     TEST_START;
     const int i = cpuid();
     if (i == 0) {
-        printk("steal test starting\n");
+        printk("steal test starting with %d cpu\n", ncpu_all());
     }
     sync(1);
 
