@@ -47,13 +47,13 @@ void main()
         shut_record();
         palloc_init();
         malloc_init();
+        test_init();
 
         arch_fence();
 
         // Set a flag indicating that the secondary CPUs can start executing.
         boot_secondary_cpus = true;
         // start running test
-        test_init();
         run_test();
     } else {
         while (!boot_secondary_cpus)
