@@ -6,6 +6,7 @@
 #include <driver/memlayout.h>
 #include <driver/base.h>
 
+/** Organize pages in singly-linked list. */
 struct page {
     struct page *nxt;
     char fre[0];
@@ -37,13 +38,13 @@ static struct pallocator allocators[NCPU];
 // the page allocator is corrupted.
 
 /** Initialize the page allocator */
-void pallocator_init(struct pallocator *pa, void *start, size_t npage);
+static void pallocator_init(struct pallocator *pa, void *start, size_t npage);
 
 /** Get a page from allocator */
-void *pallocator_get(struct pallocator *pa);
+static void *pallocator_get(struct pallocator *pa);
 
 /** Free a page to allocator(must from pallocator_get) */
-void pallocator_free(struct pallocator *pa, void *pg);
+static void pallocator_free(struct pallocator *pa, void *pg);
 
 void palloc_init(void)
 {
@@ -119,7 +120,7 @@ void palloc_free(void *pg)
 /**
  * Pallocator implementation
  */
-void pallocator_init(struct pallocator *pa, void *start, size_t npage)
+static void pallocator_init(struct pallocator *pa, void *start, size_t npage)
 {
     ASSERT(pa != NULL && start != NULL && npage != 0);
     pa->start = start;
@@ -142,7 +143,7 @@ void pallocator_init(struct pallocator *pa, void *start, size_t npage)
     CHECK_PA(pa);
 }
 
-void *pallocator_get(struct pallocator *pa)
+static void *pallocator_get(struct pallocator *pa)
 {
     // check that pa is valid
     CHECK_PA(pa);
@@ -167,7 +168,7 @@ void *pallocator_get(struct pallocator *pa)
     return ret;
 }
 
-void pallocator_free(struct pallocator *pa, void *pg)
+static void pallocator_free(struct pallocator *pa, void *pg)
 {
     // check that pa is valid
     CHECK_PA(pa);

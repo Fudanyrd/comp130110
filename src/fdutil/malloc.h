@@ -11,6 +11,7 @@
 #include <common/spinlock.h>
 
 void malloc_init(void);
+void malloc_mod_intf(struct palloc_intf intf);
 void *malloc(size_t nb);
 void free(void *pt);
 

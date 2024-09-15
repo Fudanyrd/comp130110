@@ -130,5 +130,6 @@ void test_init(void)
 
 void run_test()
 {
+    sync_record();
     alloc2023_test();
 }

@@ -1,4 +1,5 @@
 #include "malloc.h"
+#include "palloc.h"
 #include "stdint.h"
 #include "lst.h"
 #include <common/spinlock.h>
@@ -18,10 +19,10 @@ struct desc {
     uint32_t bpa; // blocks per arena
 };
 
-static void add_blocks(struct desc *d);
-
-/** Number of descriptors */
-#define NDESC 8
+/** Add a page of blocks to descriptor d. 
+ * @return 1 if success, 0 if page cannot allocate.
+ */
+static int add_blocks(struct desc *d);
 
 /** An arena */
 struct arena {
@@ -30,35 +31,92 @@ struct arena {
     uint32_t magic; // magic number
 };
 
+/** Sizes of blocks to reduce page usage */
+static const int szset[] = { 16,
+                             32,
+                             48,
+                             64,
+                             72,
+                             80,
+                             96,
+                             128,
+                             144,
+                             208,
+                             288,
+                             408,
+                             576,
+                             1016,
+                             1360,
+                             2040,
+                             PGSIZE - sizeof(struct arena) };
+
+// note that organizing so many descriptors is error-prone.
+// (No, I don't mean that my descriptor implementation has bug)
+// it is sugguested to change the array to simpler ones, for example,
+// { 16, 32, 64, 128, 256, 512, 1024, 2048 };
+
+/** Number of descriptors */
+#define NDESC ((int)(sizeof(szset) / sizeof(szset[0])))
+
 /** Returns the arena managing the blk. */
 static inline struct arena *block2arena(void *blk);
 
 /** Free the space of an arena */
 static void arena_free(struct arena *a);
 
+/** Descriptors(private) */
 static struct desc descs[NDESC];
 
 /** Arena magic number */
 #define ARENA_MAGIC 0x9a548eed
 
+/** Page allocator interface */
+static struct palloc_intf pintf;
+
 void malloc_init(void)
 {
+    STATIC_ASSERT(sizeof(struct arena) % 8 == 0);
     // initialize 8 descriptors, each handles memory
     // block of size:
     // 16, 32, 64, 128, 256
     // 512, 1024, 2048
 
-    uint32_t sz = 16U;
+    uint32_t sz;
     for (int i = 0; i < NDESC; i++) {
+        sz = szset[i];
+        if (sz % 8 != 0) {
+            PANIC("Alignment");
+        }
+        if (sz + sizeof(struct arena) > PGSIZE) {
+            PANIC("overflow");
+        }
         descs[i].bsz = sz;
         descs[i].bpa = (PGSIZE - sizeof(struct arena)) / sz;
         init_spinlock(&descs[i].lock);
         list_init(&descs[i].flst);
         ASSERT(list_empty(&descs[i].flst));
-        sz *= 2;
     }
+
+    /** Directly use pallocator interface */
+    pintf.get = palloc_get;
+    pintf.free = palloc_free;
+    /** Do not support alloc/free multiple pages */
+    pintf.getmult = NULL;
+    pintf.freemult = NULL;
 }
 
+/** Initialize malloc with a different allocator 
+ * @param intf a thread-safe pallocator interface
+ */
+void malloc_mod_intf(struct palloc_intf intf)
+{
+    ASSERT(intf.get != NULL && intf.free != NULL);
+    pintf = intf;
+}
+
+/** Allocate a block of size 2^i, 
+ * where i is the smallest integer satisfying 2^i >= nb.
+ */
 void *malloc(size_t nb)
 {
     if (nb == 0) {
@@ -86,7 +144,12 @@ void *malloc(size_t nb)
         // fetch another page, and put its blocks
         // onto the free list of the descriptor.
         // must hold the lock when doing so.
-        add_blocks(d);
+        if (add_blocks(d) == 0) {
+            // allocation failure
+            // release the lock, return null.
+            release_spinlock(&d->lock);
+            return NULL;
+        }
     }
     ASSERT(!list_empty(&d->flst));
 
@@ -99,7 +162,7 @@ void *malloc(size_t nb)
     return ret;
 }
 
-/** Currently free does nothing. */
+/** Free a block allocated by malloc. */
 void free(void *pt __attribute__((unused)))
 {
     if (pt == NULL) {
@@ -128,10 +191,14 @@ void free(void *pt __attribute__((unused)))
     release_spinlock(&d->lock);
 }
 
-static void add_blocks(struct desc *d)
+static int add_blocks(struct desc *d)
 {
     ASSERT(d != NULL);
-    void *pg = palloc_get();
+    void *pg = pintf.get();
+    /** If pg is null or max allocation exceed limit */
+    if (pg == NULL) {
+        return 0;
+    }
     increment_rc(&kalloc_page_cnt);
     ASSERT(pg != NULL);
 
@@ -151,6 +218,9 @@ static void add_blocks(struct desc *d)
         // advance.
         pg += d->bsz;
     }
+
+    // success
+    return 1;
 }
 
 static inline struct arena *block2arena(void *blk)
@@ -185,6 +255,6 @@ static void arena_free(struct arena *a)
         pg += d->bsz;
     }
 
-    palloc_free(a);
+    pintf.free(a);
     decrement_rc(&kalloc_page_cnt);
 }

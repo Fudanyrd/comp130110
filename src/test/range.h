@@ -42,6 +42,10 @@ static int rg_intersect(struct range *r1, struct range *r2)
      */
     // clang-format on
     ASSERT(r1 != NULL && r2 != NULL);
+    if (!r1->valid || !r2->valid) {
+        // invalid ranges does not intersect
+        return 0;
+    }
     void *end1 = rg_end(r1);
     void *end2 = rg_end(r2);
     return (r2->start < end1 && r2->start >= r1->start) ||
