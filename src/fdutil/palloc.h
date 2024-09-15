@@ -31,6 +31,11 @@ static inline void *pg_round_up(void *addr)
 /** Initialize palloc module */
 void palloc_init(void);
 
+/** Initialize with limited number of pages(for testing).
+ * @param npgs number of pages on each cpu.
+ */
+void palloc_init_limit(int *npgs);
+
 /** Get a single page. */
 void *palloc_get(void);
 
