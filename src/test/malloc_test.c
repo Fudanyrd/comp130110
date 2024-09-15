@@ -53,6 +53,5 @@ void test_init(void)
 
 void run_test()
 {
-    sync_record();
     malloc_test();
 }

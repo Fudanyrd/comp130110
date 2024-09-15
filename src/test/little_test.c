@@ -52,7 +52,6 @@ static void sfree(void *pg)
 
 void run_test(void)
 {
-    sync_record();
     const int i = cpuid();
     SYNC(1);
 
