@@ -19,6 +19,11 @@
 
 static volatile bool boot_secondary_cpus = false;
 
+/**
+ * Decide when secondary cpu calls shut_record().
+ */
+static volatile int shutinit = 0;
+
 #define HELLO(core)                               \
     do {                                          \
         printk("Hello world! (Core %d)\n", core); \
@@ -44,6 +49,7 @@ void main()
         debug_init();
         // boot shutdown module
         shut_init();
+        shutinit = 1;
         shut_record();
         palloc_init();
         malloc_init();
@@ -56,10 +62,12 @@ void main()
         // start running test
         run_test();
     } else {
+        while (shutinit == 0) {
+        }
+        shut_record();
         while (!boot_secondary_cpus)
             ;
         arch_fence();
-        shut_record();
 
         // start running test
         run_test();
