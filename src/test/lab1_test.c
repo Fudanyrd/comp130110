@@ -152,6 +152,7 @@ static void lab1_test()
 
 void run_test()
 {
+    sync_record();
     if (cpuid() == 0) {
         lab1_test();
     }
@@ -160,4 +161,5 @@ void run_test()
 
 void test_init()
 {
+    sync_init();
 }

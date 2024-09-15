@@ -1,5 +1,6 @@
 #include "test.h"
 #include "test_util.h"
+#include "sync.h"
 #include <fdutil/malloc.h>
 #include <fdutil/stddef.h>
 #include <common/rc.h>
@@ -19,13 +20,7 @@ static int cnt[NCPU];
  * data races are likely to happen.
  */
 
-static RefCount x;
-#define SYNC(i)             \
-    arch_dsb_sy();          \
-    increment_rc(&x);       \
-    while (x.count < 4 * i) \
-        ;                   \
-    arch_dsb_sy();
+#define SYNC(i) sync(i)
 
 /** Single page allocator */
 struct sallocator {
@@ -57,6 +52,7 @@ static void sfree(void *pg)
 
 void run_test(void)
 {
+    sync_record();
     const int i = cpuid();
     SYNC(1);
 
@@ -107,6 +103,7 @@ void run_test(void)
 
 void test_init()
 {
+    sync_init();
     init_spinlock(&sa.lock);
     /* Initliaze with single page */
     sa.pg = palloc_get();
