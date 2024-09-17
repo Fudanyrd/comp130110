@@ -241,3 +241,7 @@ void run_test(void)
     if (cpuid() == 0)
         bitmap_test();
 }
+
+void test_init(void)
+{
+}

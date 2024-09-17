@@ -18,9 +18,15 @@ add_library(test STATIC "${test_util_src};kalloc_test.c")
 # test cases
 # Hint: (use semicolon to separate; do NOT add whitespaces)
 # Lab 0: Boot
-# set(tcases "debug;bitmap;lst;" CACHE STRING "")
+set(lab0cases "debug;bitmap;lst")
 # Lab 1: malloc
-set(tcases "palloc;malloc;alloc2023;lab1;little;steal" CACHE STRING "")
+set(lab1cases "palloc;malloc;alloc2023;lab1;little;steal")
+
+# enabled test cases
+# (warning: too many test cases result in too many images)
+# TO ENABLE ALL TESTS: 
+# set(tcases "${lab0cases};${lab1cases};...;${labncases}" CACHE STRING "")
+set(tcases "${lab1cases}" CACHE STRING "")
 
 # add all of your test cases here.
 # and build a library for it.

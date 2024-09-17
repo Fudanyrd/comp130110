@@ -9,7 +9,9 @@ static void baz(void);
 void debug_test(void)
 {
     // this is a single-core test.
+    TEST_START;
     foo();
+    TEST_END;
 }
 
 static void foo(void)
@@ -39,4 +41,8 @@ void run_test(void)
     // i.e. not concurrent
     if (cpuid() == 0)
         debug_test();
+}
+
+void test_init(void)
+{
 }
