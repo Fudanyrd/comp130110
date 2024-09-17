@@ -6,6 +6,7 @@
 
 static SpinLock sd_lock;
 static volatile int ncpu;
+static volatile int all;
 
 #define Lock(lk) acquire_spinlock(&lk)
 #define Unlock(lk) release_spinlock(&lk)
@@ -48,5 +49,16 @@ void shut_record(void)
 {
     Lock(sd_lock);
     ncpu++;
+    all = ncpu;
     Unlock(sd_lock);
+}
+
+int ncpu_all()
+{
+    return all;
+}
+
+int ncpu_run()
+{
+    return ncpu;
 }

@@ -76,12 +76,68 @@ void palloc_init(void)
     ASSERT(first == last);
 }
 
+void palloc_init_limit(int *npgs)
+{
+    struct pallocator *p;
+    for (int i = 0; i < NCPU; i++) {
+        p = &allocators[i];
+        p->frepg = NULL;
+        if (npgs[i] == 0) {
+            // invalidate the pallocator
+            // i.e. this allocator does not
+            // allocate any pages
+            p->start = NULL;
+            p->end = NULL;
+            p->npage = 0;
+        } else {
+            // use only npgs pages
+            ASSERT(npgs[i] >= 0);
+            ASSERT((size_t)(npgs[i]) <= p->npage);
+            p->npage = (size_t)(npgs[i]);
+            p->end = p->start + (npgs[i] * PGSIZE);
+            // push this many pages
+            for (void *pt = p->start; pt < p->end; pt += PGSIZE) {
+                p->nalloc += 1;
+                pallocator_free(p, pt);
+            }
+            p->nalloc = 0;
+        }
+
+        CHECK_PA(p);
+    }
+}
+
 void *palloc_get(void)
 {
     const int cpu = cpuid();
     // currently just allocate from its own allocator.
     // do not steal from other allocators.
-    return pallocator_get(&allocators[cpu]);
+    //
+    // that is the past. Here we'll try implement
+    // page stealing. First turn to local allocator.
+    void *ret = pallocator_get(&allocators[cpu]);
+    if (ret != NULL) {
+        // yeah!
+        return ret;
+    }
+
+    // seek each cpu sequentially for some.
+    // this is the slow path, and does not happen
+    // frequently.
+    for (int i = 0; i < NCPU; i++) {
+        if (i == cpu) {
+            // do not try local cpu.
+            continue;
+        }
+        ret = pallocator_get(&allocators[i]);
+        if (ret != NULL) {
+            return ret;
+        }
+    }
+
+    // well, all allocators run out of pages.
+    // (This will happen rarely)
+    return NULL;
 }
 
 size_t palloc_used(void)

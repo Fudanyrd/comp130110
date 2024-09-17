@@ -80,3 +80,7 @@ void run_test(void)
     if (cpuid() == 0)
         lst_test();
 }
+
+void test_init(void)
+{
+}
