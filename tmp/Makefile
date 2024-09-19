@@ -1,14 +1,19 @@
 src = sysutil.c shell.c
 sh_objs = shell.o sysutil.o
+load_objs = load.o sysutil.o
 CC = gcc
-CFLAGS = -g
+CFLAGS = -g -static 
 
 all: sh
 sh: $(sh_objs)
 	$(CC) $(sh_objs) -o sh
+load: $(load_objs)
+	$(CC) $(load_objs) -o load
 
 args: args.c
 	$(CC) -g args.c -o args
+hello: hello.c
+	$(CC) -g -static hello.c -o hello
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

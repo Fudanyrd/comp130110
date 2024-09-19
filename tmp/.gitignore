@@ -1,5 +1,7 @@
 # binaries
 sh
 args
+hello
+load
 *.o
 .gdbinit

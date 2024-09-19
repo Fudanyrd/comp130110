@@ -37,4 +37,9 @@ void job_exec_noret(struct job_t *job);
  */
 int System(const char *cmd);
 
+/**
+ * Load and execute a program.
+ */
+void loader(char *argc, char **argv);
+
 #endif // __SYSUTIL_H_

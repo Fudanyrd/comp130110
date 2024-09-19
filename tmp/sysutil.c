@@ -8,6 +8,9 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <stdio.h>
+#include <sys/mman.h>
+#include <elf.h>
+#include <assert.h>
 
 static int Fork()
 {
@@ -293,6 +296,72 @@ int System(const char *cmd)
     }
 
     return ret;
+}
+
+void loader(char *argc, char **argv)
+{
+#define Round(foo, bar) ((uintptr_t)foo & ~(bar - 1))
+    // open executable(elf format)
+    int fd = Open(argc, O_RDONLY);
+    // map the elf header to an arbitrary place.
+    Elf64_Ehdr *eh = mmap(NULL, 4096, PROT_READ, MAP_PRIVATE, fd, 0);
+    assert(eh != (void *)-1);
+
+    // program header
+    Elf64_Phdr *ph = (Elf64_Phdr *)((void *)eh + eh->e_phoff);
+    for (int i = 0; i < eh->e_phnum; i++) {
+        Elf64_Phdr *p = &ph[i];
+        // ref: elf.h:715
+        switch (p->p_type) {
+        case PT_LOAD: { // loadable segment
+            int prot = 0; // page protectionn
+            if (p->p_flags & PF_X) {
+                // executable
+                prot |= PROT_EXEC;
+            }
+            if (p->p_flags & PF_R) {
+                // readable
+                prot |= PROT_READ;
+            }
+            if (p->p_flags & PF_W) {
+                // writable
+                prot |= PROT_WRITE;
+            }
+
+            // clang-format off
+            void *ret = mmap(
+                (void *)Round(p->p_vaddr, p->p_align), 
+                p->p_memsz + (uintptr_t)p->p_vaddr % p->p_align, 
+                prot, 
+                MAP_PRIVATE | MAP_FIXED, 
+                fd, 
+                Round(p->p_offset, p->p_align));
+            // clang-format on
+            assert(ret != (void *)-1);
+            if (p->p_memsz > p->p_filesz) {
+                memset((void *)(p->p_vaddr + p->p_filesz), 0,
+                       p->p_memsz - p->p_filesz);
+            }
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    // close file
+    close(fd);
+
+    // jump to first instruction, start execution
+    // currently set argc and argv to NULL.
+    asm volatile("mov x0, #0");
+    asm volatile("mov x1, #0");
+    // jump to entry point
+    asm volatile("mov lr, %0" : : "r"(eh->e_entry));
+    asm volatile("ret");
+
+    // return, jump to x30
+    return;
 }
 
 #if 0
