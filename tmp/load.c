@@ -1,8 +1,11 @@
 #include "sysutil.h"
+#include <stdio.h>
 
-int main()
+int main(int argc, char **argv)
 {
-    char *argv[] = { (void *)0 };
-    loader("hello", argv);
+    if (argc < 2) {
+        printf("usage load <exe> argv\n");
+    }
+    loader(argv[1], argv + 1);
     return 0;
 }

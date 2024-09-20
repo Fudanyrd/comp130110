@@ -12,6 +12,8 @@ load: $(load_objs)
 
 args: args.c
 	$(CC) -g args.c -o args
+argls: argls.c
+	$(CC) -S argls.c && $(CC) -static -g -c argls.c && ld argls.o -o argls
 hello: minimal.S
 	$(CC) -g -static -c minimal.S && ld minimal.o -o hello
 
@@ -20,7 +22,7 @@ hello: minimal.S
 
 .PHONY: clean
 clean:
-	rm *.o 
+	rm *.o *.s
 
 .PHONY: format
 format: fmt.sh
