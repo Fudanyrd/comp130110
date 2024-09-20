@@ -352,12 +352,34 @@ void loader(char *argc, char **argv)
     // close file
     close(fd);
 
+    static char stk[16384];
+    static char *args[32];
+    int narg = 0;
+    // stack pointer, aligned to 16
+    void *sp = (void *)stk + sizeof(stk);
+    sp = (void *)Round(sp, 0x10);
+
+    // setup stack
+    for (; argv[narg] != NULL; narg++) {
+        sp -= 0x10;
+        args[narg] = sp;
+        strcpy(sp, argv[narg]);
+    }
+    args[narg] = NULL;
+    sp -= 0x10;
+    *(long *)sp = (long)narg;
+    *(void **)(sp + 0x8) = (void *)args;
+
     // jump to first instruction, start execution
     // currently set argc and argv to NULL.
     asm volatile("mov x0, #0");
     asm volatile("mov x1, #0");
     // jump to entry point
     asm volatile("mov lr, %0" : : "r"(eh->e_entry));
+    asm volatile("mov sp, %0" : : "r"(sp));
+    // recover x0, x1(on stack)
+    asm volatile("ldr x0, [sp]");
+    asm volatile("ldr x1, [sp, #8]");
     asm volatile("ret");
 
     // return, jump to x30
