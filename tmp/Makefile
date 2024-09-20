@@ -12,8 +12,8 @@ load: $(load_objs)
 
 args: args.c
 	$(CC) -g args.c -o args
-hello: hello.c
-	$(CC) -g -static hello.c -o hello
+hello: minimal.S
+	$(CC) -g -static -c minimal.S && ld minimal.o -o hello
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
