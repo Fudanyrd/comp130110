@@ -21,8 +21,8 @@ args: args.c
 include libc/Makefile
 
 # "User programs"
-usr_objs = argls.o
-uprog = hello argls
+usr_objs = argls.o echo.o
+uprog = hello argls echo
 uprog: $(libc_objs) $(usr_objs)
 
 CFLAGS += -ffreestanding -fno-common -nostdlib -fno-pie -no-pie -MD -I./libc 

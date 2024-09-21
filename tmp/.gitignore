@@ -2,6 +2,7 @@
 sh
 argls
 args
+echo
 hello
 load
 *.o
