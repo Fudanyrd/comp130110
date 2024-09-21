@@ -12,35 +12,8 @@
 #define syscall asm volatile("svc #0")
 #define main _start
 
-static uintptr_t Strlen(const char *s)
-{
-    if (s == (void *)0) {
-        return 0;
-    }
-
-    uintptr_t i = 0;
-    while (s[i] != 0) {
-        i++;
-    }
-    return i;
-}
-
-static void Puts(const char *s)
-{
-    asm volatile("mov x2, %0" : : "r"(Strlen(s)));
-    asm volatile("mov x1, %0" : : "r"(s));
-    asm volatile("mov x0, #1");
-    asm volatile("mov w8, #64");
-    syscall;
-    return;
-}
-
-static void Exit(int code)
-{
-    asm volatile("mov w8, #93");
-    asm volatile("mov x0, %0" : : "r"(code));
-    syscall;
-}
+#include <stdio.h>
+#include <stdlib.h>
 
 void main(int argc, char **argv)
 {

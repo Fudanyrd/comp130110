@@ -10,3 +10,4 @@ a.out
 *.s
 *.tar
 *.zip
+*.d

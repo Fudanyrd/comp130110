@@ -15,13 +15,13 @@
 #define MAXARGV 32
 
 struct job_t {
-	char *exe;
-	char *argv[MAXARGV];
-	char *stdin2;  // redirect stdin to
-	char *stdout2;  // redirect stdin to
-	char *stderr2;  // redirect stdin to
-	int pip;       // create pipe?
-	struct job_t *nxt;
+    char *exe;
+    char *argv[MAXARGV];
+    char *stdin2; // redirect stdin to
+    char *stdout2; // redirect stdin to
+    char *stderr2; // redirect stdin to
+    int pip; // create pipe?
+    struct job_t *nxt;
 };
 
 /**
