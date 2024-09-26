@@ -45,6 +45,7 @@ struct proc {
     struct context context; // thread context
     enum proc_stat stat; // status
     unsigned int pid; // id
+    void *chan; // channel
     char stk[4096]; // stack
 };
 
@@ -94,8 +95,42 @@ static void proc_exit()
 {
     int off = mycpu.running - (struct proc *)procs;
     procs[off].stat = UNUSED;
+
+    // wakeup sleeping threads
+    for (int i = 0; i < NPROC; i++) {
+        if (procs[i].stat == BLOCKED && procs[i].chan == &procs[i]) {
+            // wake the thread up
+            procs[i].chan = NULL;
+            procs[i].stat = RUNNABLE;
+        }
+    }
     // switch to 'kernel'
     swtch(&(procs[off].context), &mycpu.context);
+}
+
+// wait for proc pid to finish;
+// returns -1 if no process has id pid.
+static int proc_wait(int pid)
+{
+    // block execution
+    int off = mycpu.running - (struct proc *)procs;
+    procs[off].stat = BLOCKED;
+
+    struct proc *p = NULL;
+    for (int i = 0; i < NPROC; i++) {
+        if (procs[i].pid == pid) {
+            p = &procs[i];
+        }
+    }
+    if (p == NULL) {
+        // not found, or exit
+        return -1;
+    }
+    procs[off].chan = p;
+
+    // switch to 'kernel'
+    swtch(&(procs[off].context), &mycpu.context);
+    return 0;
 }
 
 static void syswrite(const char *fmt)
@@ -135,15 +170,17 @@ static void scheduler()
 void foo()
 {
     for (int i = 0; i < 10; i++) {
-        printf("A");
+        printf("foo\n");
         proc_yield();
     }
     proc_exit();
 }
 void bar()
 {
+    // wait for proc foo to finish!
+    proc_wait(2);
     for (int i = 0; i < 10; i++) {
-        printf("BB");
+        printf("bar\n");
         proc_yield();
     }
     proc_exit();
@@ -158,6 +195,6 @@ int main(int argc, char **argv)
     printf("started foo bar\n");
 
     scheduler();
-    printf("\nfinished foo bar\n");
+    printf("finished foo bar\n");
     return 0;
 }

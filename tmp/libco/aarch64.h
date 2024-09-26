@@ -112,7 +112,8 @@
     _(le)                                                            \
     _(gt)                                                            \
     _(lt)                                                            \
-    _(ge) _(le) /* unsigned higher or same; unsigned lower */        \
+    _(ge)                                                            \
+    _(le) /* unsigned higher or same; unsigned lower */              \
             _(hs) _(lo)
 
 // a few examples written in (inline) assembly

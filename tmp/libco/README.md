@@ -15,4 +15,8 @@ Currently support:
     <td> proc_exit </td>
     <td> thread itself stops execution </td>
   </tr>
+  <tr>
+    <td> proc_wait </td>
+    <td> suspend, wait for another thread to exit </td>
+  </tr>
 </table>
