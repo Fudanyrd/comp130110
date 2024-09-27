@@ -1,5 +1,11 @@
 #include <aarch64/intrinsic.h>
 #include <driver/uart.h>
+#include <driver/timer.h>
+#include <driver/interrupt.h>
+#include <driver/gicv3.h>
+#include <driver/timer.h>
+#include <kernel/proc.h>
+#include <kernel/sched.h>
 #include <kernel/printk.h>
 #include <kernel/shutdown.h>
 #include <kernel/core.h>
@@ -47,9 +53,19 @@ void main()
         uart_init();
         printk_init();
         debug_init();
+
+        gicv3_init();
+        gicv3_init_percpu();
+        timer_init(1000);
+        timer_init_percpu();
+        init_sched();
+        init_kproc();
+        smp_init();
+
         // boot shutdown module
         shut_init();
         shutinit = 1;
+        __sync_synchronize();
         shut_record();
         palloc_init();
         malloc_init();
@@ -59,6 +75,7 @@ void main()
 
         // Set a flag indicating that the secondary CPUs can start executing.
         boot_secondary_cpus = true;
+        __sync_synchronize();
         // start running test
         run_test();
     } else {
@@ -68,6 +85,8 @@ void main()
         while (!boot_secondary_cpus)
             ;
         arch_fence();
+        timer_init_percpu();
+        gicv3_init_percpu();
 
         // start running test
         run_test();
