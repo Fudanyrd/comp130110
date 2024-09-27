@@ -3,6 +3,7 @@
 #include <kernel/printk.h>
 #include <kernel/sched.h>
 #include <test/test.h>
+#include <fdutil/stddef.h>
 
 volatile bool panic_flag;
 

@@ -56,6 +56,5 @@ void main()
         gicv3_init_percpu();
     }
 
-    kalloc_test();
     set_return_addr(idle_entry);
 }

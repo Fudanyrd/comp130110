@@ -10,10 +10,11 @@ set(test_util_src
     rand.c
     range.c
     sync.c
+    proc_test.c
 )
 add_library(test_util STATIC ${test_util_src})
 # make test a fake lib which does not run any test in reality.
-add_library(test STATIC "${test_util_src};kalloc_test.c")
+add_library(test STATIC "${test_util_src}")
 
 # test cases
 # Hint: (use semicolon to separate; do NOT add whitespaces)

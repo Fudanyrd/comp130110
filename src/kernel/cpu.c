@@ -6,6 +6,9 @@
 
 struct cpu cpus[NCPU];
 
+/** Idle process on each cpu */
+struct Proc idleproc[NCPU];
+
 void set_cpu_on()
 {
     ASSERT(!_arch_disable_trap());
