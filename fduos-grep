@@ -1,0 +1,42 @@
+#!/usr/bin/python3
+import sys
+import os
+import subprocess
+
+def getfn():
+    res = []
+    code = subprocess.run(
+        "find -name *.c",
+        shell=True,
+        capture_output=True
+    )
+
+    res += str(code.stdout).split('\\n')
+    code = subprocess.run(
+        "find -name *.h",
+        shell=True,
+        capture_output=True
+    )
+    res += str(code.stdout).split('\\n')
+
+    return res;
+
+if __name__ == "__main__":
+    args = sys.argv
+    if len(args) < 2:
+        print("usage fduos-grep <pattern>")
+        exit()
+    files = getfn()
+    for file in files:
+        if os.path.exists(file):
+            ret = subprocess.run(
+                f"grep -n {args[1]} {file}",
+                shell=True, 
+                stdout=subprocess.PIPE,
+                text=True,
+            )
+            if len(str(ret.stdout)) != 0:
+                lst = ret.stdout.split('\n')
+                for w in lst:
+                    if len(w):
+                        print(f"{file}:{str(w)}")
