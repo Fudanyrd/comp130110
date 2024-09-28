@@ -121,13 +121,18 @@ static void update_this_state(enum procstate new_state)
     }
     case (RUNNABLE): {
         // ok
+        // if not idle, push back to the queue
+        // no need to remove from queue,
+        // since it is done in pick_next().
+        if (!p->idle) {
+            list_push_back(&queue, &p->schq);
+        }
         break;
     }
     case (ZOMBIE):
     case (SLEEPING): {
         // remove from the sched queue.
         // lock already held.
-        list_remove(&p->schq);
         break;
     }
     default:
@@ -168,17 +173,22 @@ void sched(enum procstate new_state)
     update_this_proc(next);
     ASSERT(next != NULL);
     ASSERT(next->state == RUNNABLE);
+    mycpu()->proc = next;
     next->state = RUNNING;
     if (next != this) {
-        swtch(&next->kcontext, &this->kcontext);
+        swtch(&this->kcontext, &next->kcontext);
     }
-    mycpu()->proc = next;
     release_sched_lock();
 }
 
 u64 proc_entry(void (*entry)(u64), u64 arg)
 {
+    // at sched() will hold sched_lock,
+    // hence need to release it to avoid deadlock.
+    // [PITFALL]
     release_sched_lock();
     set_return_addr(entry);
+    // return arg will put arg into x0,
+    // and the proc can retrieve its parameter.
     return arg;
 }

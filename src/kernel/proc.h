@@ -102,6 +102,7 @@ void init_kproc();
 void init_kproc_test();
 void init_proc(Proc *);
 Proc *create_proc();
+void set_parent_to_this(Proc *proc);
 int start_proc(Proc *, void (*entry)(u64), u64 arg);
 NO_RETURN void exit(int code);
 int wait(int *exitcode);

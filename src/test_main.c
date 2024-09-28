@@ -58,8 +58,6 @@ void main()
         gicv3_init_percpu();
         timer_init(1000);
         timer_init_percpu();
-        init_sched();
-        init_kproc();
         smp_init();
 
         // boot shutdown module
@@ -69,6 +67,8 @@ void main()
         shut_record();
         palloc_init();
         malloc_init();
+        init_sched();
+        init_kproc_test();
         test_init();
 
         arch_fence();

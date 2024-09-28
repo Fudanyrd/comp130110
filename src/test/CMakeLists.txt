@@ -22,12 +22,14 @@ add_library(test STATIC "${test_util_src}")
 set(lab0cases "debug;bitmap;lst")
 # Lab 1: malloc
 set(lab1cases "palloc;malloc;alloc2023;lab1;little;steal")
+# Lab 2: kernel proc
+set(lab2cases "alloc2023;pcreat;pwait")
 
 # enabled test cases
 # (warning: too many test cases result in too many images)
 # TO ENABLE ALL TESTS: 
 # set(tcases "${lab0cases};${lab1cases};...;${labncases}" CACHE STRING "")
-set(tcases "${lab1cases}" CACHE STRING "")
+set(tcases "${lab2cases}" CACHE STRING "")
 
 # add all of your test cases here.
 # and build a library for it.
