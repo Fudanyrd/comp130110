@@ -2,10 +2,14 @@
 #include <common/string.h>
 #include <driver/uart.h>
 #include <kernel/core.h>
+#include <kernel/cpu.h>
 #include <kernel/mem.h>
 #include <kernel/printk.h>
-#include <common/debug.h>
-#include <test/test.h>
+#include <kernel/sched.h>
+#include <driver/interrupt.h>
+#include <kernel/proc.h>
+#include <driver/gicv3.h>
+#include <driver/timer.h>
 
 static volatile bool boot_secondary_cpus = false;
 
@@ -16,13 +20,29 @@ void main()
         extern char edata[], end[];
         memset(edata, 0, (usize)(end - edata));
 
-        smp_init();
+        /* initialize interrupt handler */
+        init_interrupt();
+
         uart_init();
         printk_init();
         debug_init();
 
+        gicv3_init();
+        gicv3_init_percpu();
+
+        timer_init(1000);
+        timer_init_percpu();
+
         /* initialize kernel memory allocator */
         kinit();
+
+        /* initialize sched */
+        init_sched();
+
+        /* initialize kernel proc */
+        init_kproc();
+
+        smp_init();
 
         arch_fence();
 
@@ -32,8 +52,9 @@ void main()
         while (!boot_secondary_cpus)
             ;
         arch_fence();
+        timer_init_percpu();
+        gicv3_init_percpu();
     }
 
-    kalloc_test();
     set_return_addr(idle_entry);
 }

@@ -10,10 +10,11 @@ set(test_util_src
     rand.c
     range.c
     sync.c
+    proc_test.c
 )
 add_library(test_util STATIC ${test_util_src})
 # make test a fake lib which does not run any test in reality.
-add_library(test STATIC "${test_util_src};kalloc_test.c")
+add_library(test STATIC "${test_util_src}")
 
 # test cases
 # Hint: (use semicolon to separate; do NOT add whitespaces)
@@ -21,12 +22,14 @@ add_library(test STATIC "${test_util_src};kalloc_test.c")
 set(lab0cases "debug;bitmap;lst")
 # Lab 1: malloc
 set(lab1cases "palloc;malloc;alloc2023;lab1;little;steal")
+# Lab 2: kernel proc
+set(lab2cases "alloc2023;pcreat;pwait;pwtmany;prpr;prpr2;prpr3;prpr4;pstree;pstree2")
 
 # enabled test cases
 # (warning: too many test cases result in too many images)
 # TO ENABLE ALL TESTS: 
 # set(tcases "${lab0cases};${lab1cases};...;${labncases}" CACHE STRING "")
-set(tcases "${lab1cases}" CACHE STRING "")
+set(tcases "${lab2cases}" CACHE STRING "")
 
 # add all of your test cases here.
 # and build a library for it.
