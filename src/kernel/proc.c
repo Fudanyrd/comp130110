@@ -10,6 +10,23 @@
 
 #define myproc thisproc()
 
+static void sleep(void *chan, SpinLock *lock) __attribute__((unused));
+static void wakeup(struct Proc *p, void *chan) __attribute__((unused));
+static void sleep(void *chan, SpinLock *lock)
+{
+    acquire_sched_lock();
+    myproc->chan = chan;
+    release_spinlock(lock);
+    sched(SLEEPING);
+    // reacquire lock
+    acquire_spinlock(lock);
+}
+static void wakeup(struct Proc *p, void *chan)
+{
+    if (p->state == SLEEPING && p->chan == chan)
+        activate_proc(p);
+}
+
 static int nextid = 1;
 static SpinLock pid_lock;
 static int allocpid()
@@ -56,10 +73,8 @@ void init_kproc()
 static void root_entry(u64 unused __attribute__((unused)))
 {
     int code;
-    release_sched_lock();
     while (1) {
         yield();
-        release_sched_lock();
         if (wait(&code) < 0) {
             // no more child!
             shutdown();
@@ -92,6 +107,7 @@ void init_proc(Proc *p)
     p->pid = allocpid();
     p->exitcode = 0;
     p->parent = NULL;
+    p->chan = NULL;
     list_init(&p->children);
     init_sem(&p->childexit, 0);
     // kstack is allocated in init_proc(),
@@ -113,6 +129,10 @@ void set_parent_to_this(Proc *proc)
     // NOTE: maybe you need to lock the process tree
     // NOTE: it's ensured that the old proc->parent = NULL
     acquire_spinlock(&pstree_lock);
+    // [PITFALL]: remove from old parent's children list
+    if (proc->parent != NULL) {
+        list_remove(&proc->ptnode);
+    }
     proc->parent = myproc;
     list_push_back(&myproc->children, &proc->ptnode);
     release_spinlock(&pstree_lock);
@@ -152,20 +172,33 @@ int wait(int *exitcode)
     // TODO:
     ASSERT(exitcode != NULL);
     struct Proc *p = myproc;
+    ASSERT(p->state == RUNNING);
     // 1. return -1 if no children
+    // [PITFALL] if one proc is writeing pstree,
+    // list_empty would get incorrect result.
+    acquire_spinlock(&pstree_lock);
     if (list_empty(&p->children)) {
+        release_spinlock(&pstree_lock);
         return -1;
     }
+    // [PITFALL]: must release pstree_lock,
+    // if its child call exit(), then it will try to
+    // acquire pstree_lock, which results in deadlock.
+    release_spinlock(&pstree_lock);
+
     // 2. wait for childexit
     wait_sem(&p->childexit);
+    // reacquire lock
+    acquire_spinlock(&pstree_lock);
     // 3. if any child exits, clean it up and return its pid and exitcode
     int ret = -1;
     ASSERT(!list_empty(&p->children));
     struct list_elem *e = list_begin(&p->children);
-    acquire_spinlock(&pstree_lock);
     for (; e != list_end(&p->children); e = list_next(e)) {
         struct Proc *chd = list_entry(e, struct Proc, ptnode);
+        // validate child proc
         ASSERT(chd->parent == p);
+        ASSERT(chd->pid >= 0);
         if (chd->state == ZOMBIE) {
             // remove the child from children list
             list_remove(&chd->ptnode);
@@ -201,19 +234,31 @@ NO_RETURN void exit(int code)
     // [PITFALL]
 
     // 3. transfer children to the root_proc, and notify the root_proc if there is zombie
+    int rootcnt = 0; // num post_sem
     acquire_spinlock(&pstree_lock);
     struct list_elem *e;
     while (!list_empty(&p->children)) {
         e = list_pop_front(&p->children);
         list_push_back(&root_proc.children, e);
+        struct Proc *chd = list_entry(e, struct Proc, ptnode);
+        ASSERT(chd->state != UNUSED);
+        chd->parent = &root_proc;
+        // if there is zombei proc, wakeup root proc.
+        if (chd->state == ZOMBIE) {
+            ++rootcnt;
+        }
     }
-    release_spinlock(&pstree_lock);
 
     // 3.1 wakeup its parent
     // This is not described in the comment[PITFALL]
     struct Proc *parent = p->parent;
     if (p != parent) {
         post_sem(&parent->childexit);
+    }
+    release_spinlock(&pstree_lock);
+
+    for (int i = 0; i < rootcnt; i++) {
+        post_sem(&root_proc.childexit);
     }
 
     // 4. sched(ZOMBIE)

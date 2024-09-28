@@ -31,6 +31,8 @@ void init_sched()
         // mark as idle thread
         idleproc[i].idle = 1;
         idleproc[i].state = RUNNING;
+        list_init(&idleproc[i].children);
+        init_sem(&idleproc[i].childexit, 0);
     }
 }
 
