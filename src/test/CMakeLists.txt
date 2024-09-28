@@ -23,7 +23,7 @@ set(lab0cases "debug;bitmap;lst")
 # Lab 1: malloc
 set(lab1cases "palloc;malloc;alloc2023;lab1;little;steal")
 # Lab 2: kernel proc
-set(lab2cases "alloc2023;pcreat;pwait;pwtmany;prpr;prpr2;prpr3;pstree")
+set(lab2cases "alloc2023;pcreat;pwait;pwtmany;prpr;prpr2;prpr3;prpr4;pstree;pstree2")
 
 # enabled test cases
 # (warning: too many test cases result in too many images)
