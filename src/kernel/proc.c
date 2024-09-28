@@ -10,6 +10,11 @@
 
 #define myproc thisproc()
 
+/** Turn on/off logging */
+#define Log(fmt, ...) printk(fmt, ##__VA_ARGS__)
+#undef Log
+#define Log(fmt, ...)
+
 static void sleep(void *chan, SpinLock *lock) __attribute__((unused));
 static void wakeup(struct Proc *p, void *chan) __attribute__((unused));
 static void sleep(void *chan, SpinLock *lock)
@@ -176,8 +181,10 @@ int wait(int *exitcode)
     // 1. return -1 if no children
     // [PITFALL] if one proc is writeing pstree,
     // list_empty would get incorrect result.
+wait_st:
     acquire_spinlock(&pstree_lock);
     if (list_empty(&p->children)) {
+        Log("no children\n");
         release_spinlock(&pstree_lock);
         return -1;
     }
@@ -199,6 +206,7 @@ int wait(int *exitcode)
         // validate child proc
         ASSERT(chd->parent == p);
         ASSERT(chd->pid >= 0);
+        Log("(%d): state %d\n", chd->pid, (int)chd->state);
         if (chd->state == ZOMBIE) {
             // remove the child from children list
             list_remove(&chd->ptnode);
@@ -216,6 +224,10 @@ int wait(int *exitcode)
         }
     }
     release_spinlock(&pstree_lock);
+    if (ret < 0) {
+        // not found, possibly accedential wakeup.
+        goto wait_st;
+    }
 
     // NOTE: be careful of concurrency
     return ret;
@@ -226,6 +238,13 @@ NO_RETURN void exit(int code)
     // TODO:
     struct Proc *p = myproc;
     // 1. set the exitcode
+    // [PITFALL] lock must be held, cause other proc
+    // may be reading p->state or p->exitcode.
+    // see test case prpr2.
+    // Want to ensure that proc woke up in wait can
+    // see at least one zombie proc.
+    acquire_spinlock(&pstree_lock);
+    p->state = ZOMBIE;
     p->exitcode = code;
     // 2. clean up the resources
     // shold not call kfree_page, for later
@@ -235,7 +254,6 @@ NO_RETURN void exit(int code)
 
     // 3. transfer children to the root_proc, and notify the root_proc if there is zombie
     int rootcnt = 0; // num post_sem
-    acquire_spinlock(&pstree_lock);
     struct list_elem *e;
     while (!list_empty(&p->children)) {
         e = list_pop_front(&p->children);
@@ -257,6 +275,7 @@ NO_RETURN void exit(int code)
     }
     release_spinlock(&pstree_lock);
 
+    // notify the root process of added children.
     for (int i = 0; i < rootcnt; i++) {
         post_sem(&root_proc.childexit);
     }

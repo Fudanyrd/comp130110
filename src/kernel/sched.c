@@ -169,7 +169,7 @@ static void update_this_proc(Proc *p)
 void sched(enum procstate new_state)
 {
     auto this = thisproc();
-    ASSERT(this->state == RUNNING);
+    ASSERT(this->state == RUNNING || this->state == ZOMBIE);
     update_this_state(new_state);
     auto next = pick_next();
     update_this_proc(next);
