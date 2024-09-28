@@ -28,6 +28,7 @@ swtch:
     mov x2,  sp    // cannot directly store/load sp
     str x2,  [x0, #120]
     str x0,  [x0, #128]
+    str x1,  [x0, #136]
 
     // retrieve new ones
     ldr  x8, [x1,   #0]
@@ -47,5 +48,6 @@ swtch:
     ldr lr,  [x1, #112]
     ldr x2,  [x1, #120]
     ldr x0,  [x1, #128]
+    ldr x1,  [x1, #136]
     mov sp,  x2
     ret

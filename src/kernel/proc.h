@@ -71,6 +71,7 @@ typedef struct KernelContext {
     uintptr_t lr; /* 112 */
     uintptr_t sp; /* 120 */
     uint64_t x0; /* 128 */
+    uint64_t x1; /* 136 */
 } KernelContext;
 
 // embeded data for procs
@@ -98,6 +99,7 @@ typedef struct Proc {
 } Proc;
 
 void init_kproc();
+void init_kproc_test();
 void init_proc(Proc *);
 Proc *create_proc();
 int start_proc(Proc *, void (*entry)(u64), u64 arg);
