@@ -82,5 +82,8 @@ void run_test()
     if (cpuid() == 0) {
         printk("proc reparent test\n");
     }
+    // enable trap
+    set_cpu_on();
+    _arch_enable_trap();
     yield();
 }
