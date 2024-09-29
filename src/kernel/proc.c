@@ -246,7 +246,7 @@ NO_RETURN void exit(int code)
     // Want to ensure that proc woke up in wait can
     // see at least one zombie proc.
     acquire_spinlock(&pstree_lock);
-    p->state = ZOMBIE;
+    // p->state = ZOMBIE;
     p->exitcode = code;
     // 2. clean up the resources
     // shold not call kfree_page, for later
@@ -283,10 +283,18 @@ NO_RETURN void exit(int code)
         if (p != &root_proc)
             post_sem(&root_proc.childexit);
     }
-    release_spinlock(&pstree_lock);
 
     // 4. sched(ZOMBIE)
     acquire_sched_lock();
+    // we have notified its parent and/or root proc that one of the child
+    // is ready. but BEFORE we set its state to zombie, the parent/root
+    // proc should NOT read its state. this is done by preempting the
+    // sched lock and then release the pstree_lock.
+
+    // release pstree lock allows parent/root to scan its children,
+    // but they will have to acquire the sched lock, at which time
+    // they can see the zombie state of thisproc().
+    release_spinlock(&pstree_lock);
     sched(ZOMBIE);
     // will not reach
     // NOTE: be careful of concurrency
