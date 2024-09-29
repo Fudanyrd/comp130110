@@ -181,7 +181,6 @@ int wait(int *exitcode)
     // 1. return -1 if no children
     // [PITFALL] if one proc is writeing pstree,
     // list_empty would get incorrect result.
-wait_st:
     acquire_spinlock(&pstree_lock);
     if (list_empty(&p->children)) {
         Log("no children\n");
@@ -226,7 +225,7 @@ wait_st:
     release_spinlock(&pstree_lock);
     if (ret < 0) {
         // not found, possibly accedential wakeup.
-        goto wait_st;
+        PANIC("no zombie found");
     }
 
     // NOTE: be careful of concurrency
@@ -277,7 +276,8 @@ NO_RETURN void exit(int code)
 
     // notify the root process of added children.
     for (int i = 0; i < rootcnt; i++) {
-        post_sem(&root_proc.childexit);
+        if (p != &root_proc)
+            post_sem(&root_proc.childexit);
     }
 
     // 4. sched(ZOMBIE)

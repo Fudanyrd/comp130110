@@ -26,11 +26,14 @@ void init_sched()
 
     // 2. initialize the scheduler info of each CPU
     for (int i = 0; i < NCPU; i++) {
+        // initialize cpu
         cpus[i].idle = &idleproc[i];
         cpus[i].proc = NULL;
+        cpus[i].noff = 0;
         // mark as idle thread
         idleproc[i].idle = 1;
         idleproc[i].state = RUNNING;
+        idleproc[i].kstack = NULL;
         list_init(&idleproc[i].children);
         init_sem(&idleproc[i].childexit, 0);
     }
