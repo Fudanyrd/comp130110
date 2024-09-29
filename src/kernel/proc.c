@@ -206,6 +206,7 @@ int wait(int *exitcode)
         ASSERT(chd->parent == p);
         ASSERT(chd->pid >= 0);
         Log("(%d): state %d\n", chd->pid, (int)chd->state);
+        acquire_sched_lock();
         if (chd->state == ZOMBIE) {
             // remove the child from children list
             list_remove(&chd->ptnode);
@@ -219,8 +220,10 @@ int wait(int *exitcode)
             // is described in exit, "2. clean up the resources"
             kfree_page(chd->kstack);
             kfree(chd);
+            release_sched_lock();
             break;
         }
+        release_sched_lock();
     }
     release_spinlock(&pstree_lock);
     if (ret < 0) {
@@ -259,11 +262,13 @@ NO_RETURN void exit(int code)
         list_push_back(&root_proc.children, e);
         struct Proc *chd = list_entry(e, struct Proc, ptnode);
         ASSERT(chd->state != UNUSED);
+        acquire_sched_lock();
         chd->parent = &root_proc;
         // if there is zombei proc, wakeup root proc.
         if (chd->state == ZOMBIE) {
             ++rootcnt;
         }
+        release_sched_lock();
     }
 
     // 3.1 wakeup its parent
@@ -272,13 +277,13 @@ NO_RETURN void exit(int code)
     if (p != parent) {
         post_sem(&parent->childexit);
     }
-    release_spinlock(&pstree_lock);
 
     // notify the root process of added children.
     for (int i = 0; i < rootcnt; i++) {
         if (p != &root_proc)
             post_sem(&root_proc.childexit);
     }
+    release_spinlock(&pstree_lock);
 
     // 4. sched(ZOMBIE)
     acquire_sched_lock();

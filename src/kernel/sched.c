@@ -7,7 +7,9 @@
 #include <fdutil/lst.h>
 #include <common/rbtree.h>
 
-/** Scheduler lock */
+/** Scheduler lock guards the sched queue and the state
+ * of each process. Read/write to proc stat must hold
+ * the lock. */
 static SpinLock sched_lock;
 
 /** Scheduler queue */
@@ -83,6 +85,7 @@ bool activate_proc(Proc *p)
     // if the proc->state is RUNNING/RUNNABLE, do nothing
     // if the proc->state if SLEEPING/UNUSED, set the process state to RUNNABLE and add it to the sched queue
     // else: panic
+    acquire_spinlock(&sched_lock);
     switch (p->state) {
     case (RUNNING):
     case (RUNNABLE): {
@@ -92,15 +95,14 @@ bool activate_proc(Proc *p)
     case (UNUSED): {
         p->state = RUNNABLE;
         // push operation is atomic.
-        acquire_spinlock(&sched_lock);
         list_push_back(&queue, &p->schq);
-        release_spinlock(&sched_lock);
         break;
     }
     default: {
         PANIC("activate zombie proc");
     }
     }
+    release_spinlock(&sched_lock);
     return true;
 }
 
