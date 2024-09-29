@@ -28,3 +28,25 @@ void set_cpu_off()
     cpus[cpuid()].online = false;
     printk("CPU %lld: stopped\n", cpuid());
 }
+
+void push_off()
+{
+    struct cpu *cpu = &cpus[cpuid()];
+    int old = (int)cpu->online;
+    _arch_disable_trap();
+    ASSERT(cpu->noff >= 0);
+    if (cpu->noff == 0) {
+        cpu->intena = old;
+    }
+    ++cpu->noff;
+}
+
+void pop_off()
+{
+    struct cpu *cpu = &cpus[cpuid()];
+    ASSERT(cpu->noff > 0);
+    cpu->noff -= 1;
+    if (cpu->noff == 0 && cpu->intena) {
+        _arch_enable_trap();
+    }
+}
