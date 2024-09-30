@@ -20,3 +20,7 @@ args: args.c
 .PHONY: clean
 clean:
 	rm *.o *.d $(uprog)
+
+.PHONY: format
+format: fmt.sh
+	chmod +x fmt.sh && ./fmt.sh

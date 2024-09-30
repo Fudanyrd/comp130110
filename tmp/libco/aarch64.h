@@ -114,7 +114,7 @@
     _(lt)                                                            \
     _(ge)                                                            \
     _(le) /* unsigned higher or same; unsigned lower */              \
-            _(hs) _(lo)
+    _(hs) _(lo)
 
 // a few examples written in (inline) assembly
 #include <stdarg.h>
