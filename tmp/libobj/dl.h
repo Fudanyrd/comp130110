@@ -10,6 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+// how to allocate memory for .text
+#define MAP
+#undef MAP
+
 // a shared object
 struct so {
     // elf header

@@ -1,11 +1,11 @@
-all: obj fact.so load-dl dl.so
+all: obj fact.so load-dl dl.so intfn.so
 
 load-dl: dl.o load-dl.o
 	gcc dl.o load-dl.o -o load-dl
 
 OBJS = dl.o load-dl.o
 %.o: %.c
-	gcc -g -c $< -o $@
+	gcc -g -c -MD $< -o $@
 %.so: %.c
 	gcc -g -shared $< -o $@
 

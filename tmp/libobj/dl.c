@@ -60,10 +60,19 @@ void dl_open(const char *fn, struct so *s)
     s->shstrtab = shstrtab;
     s->strtab = strtab;
 
+#ifndef MAP
     s->text = malloc(text->sh_size);
     assert(s->text != NULL);
     assert(lseek(fd, text->sh_offset, SEEK_SET) != -1);
     read(fd, s->text, text->sh_size);
+#else
+#define Round(foo, bar) ((uintptr_t)foo & ~(bar - 1))
+    s->text = mmap((void *)Round(text->sh_addr, text->sh_addralign),
+                   text->sh_size + text->sh_addr % text->sh_addralign,
+                   PROT_READ | PROT_EXEC, MAP_PRIVATE, fd,
+                   Round(text->sh_offset, text->sh_addralign));
+    assert(s->text != (void *)-1);
+#endif
 }
 
 void *dl_load(const char *name, struct so *s, size_t *size)
@@ -110,5 +119,9 @@ void dl_close(struct so *s)
     free(s->strtab);
     free(s->shstrtab);
     free(s->sh);
+#ifndef MAP
     free(s->text);
+#else
+    munmap(s->text, s->sh[s->text_off].sh_size);
+#endif
 }
