@@ -9,7 +9,7 @@ uint64_t (*fn)(uint32_t);
 
 int main(int argc, char **argv)
 {
-    dl_open("fact.so", &sobj);
+    dl_open("fact-recur.so", &sobj);
     size_t size;
     fn = dl_load("fact", &sobj, &size);
     printf("%p\n", fn);
