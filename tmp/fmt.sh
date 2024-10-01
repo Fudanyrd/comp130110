@@ -1,0 +1,1 @@
+cd .. && ./fduos-format && cd -
