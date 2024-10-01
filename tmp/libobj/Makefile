@@ -1,4 +1,4 @@
-all: obj fact.so load-dl dl.so intfn.so
+all: obj fact.so load-dl dl.so intfn.so fact-recur.so
 
 load-dl: dl.o load-dl.o
 	gcc dl.o load-dl.o -o load-dl
@@ -17,4 +17,4 @@ obj: obj.c
 
 .PHONY: clean
 clean:
-	-rm *.o *.so obj
+	-rm *.o *.so obj *.d

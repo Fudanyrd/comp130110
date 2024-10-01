@@ -2,8 +2,9 @@
 
 uint64_t fact(uint32_t n)
 {
-    if (n == 0) {
-        return 1;
+    uint64_t ret = 1;
+    for (uint32_t i = 2; i <= n; i++) {
+        ret *= i;
     }
-    return fact(n - 1) * n;
+    return ret;
 }

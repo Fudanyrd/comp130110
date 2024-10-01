@@ -12,13 +12,12 @@
 
 // how to allocate memory for .text
 #define MAP
-#undef MAP
 
 // a shared object
 struct so {
     // elf header
     Elf64_Ehdr eh;
-    // section header 
+    // section header
     Elf64_Shdr *sh;
     // string table
     char *strtab;
@@ -26,6 +25,8 @@ struct so {
     char *shstrtab;
     // mapped text(code) section
     void *text;
+    // because of mmap, has bias
+    uintptr_t bias;
     // text section offset
     int text_off;
     // file descriptor

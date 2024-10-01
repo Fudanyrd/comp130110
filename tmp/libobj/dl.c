@@ -1,5 +1,29 @@
 #include "dl.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <errno.h>
+#include <dlfcn.h>
+#include <unistd.h>
+
+static void *mmap_fail(void)
+{
+    const char *error_message = dlerror();
+    if (error_message) {
+        fprintf(stderr, "mmap failed: %s\n", error_message);
+    } else {
+        fprintf(stderr, "mmap failed: %s\n", strerror(errno));
+    }
+    exit(EXIT_FAILURE);
+}
+
+static inline uintptr_t pg_round_up(uintptr_t size)
+{
+    return (size + 4095) & (~4095);
+}
+
 void dl_open(const char *fn, struct so *s)
 {
     assert(s != NULL);
@@ -67,11 +91,13 @@ void dl_open(const char *fn, struct so *s)
     read(fd, s->text, text->sh_size);
 #else
 #define Round(foo, bar) ((uintptr_t)foo & ~(bar - 1))
-    s->text = mmap((void *)Round(text->sh_addr, text->sh_addralign),
-                   text->sh_size + text->sh_addr % text->sh_addralign,
+    s->bias = text->sh_offset % 4096;
+    s->text = mmap(NULL, text->sh_size + text->sh_offset % 4096,
                    PROT_READ | PROT_EXEC, MAP_PRIVATE, fd,
-                   Round(text->sh_offset, text->sh_addralign));
-    assert(s->text != (void *)-1);
+                   Round(text->sh_offset, 4096));
+    if (s->text == (void *)-1) {
+        mmap_fail();
+    }
 #endif
 }
 
@@ -95,7 +121,7 @@ void *dl_load(const char *name, struct so *s, size_t *size)
                 if (strcmp(name, s->strtab + sym[k].st_name) == 0) {
                     // got the symbol!
                     assert(sym[k].st_value >= s->sh[s->text_off].sh_addr);
-                    ret = s->text +
+                    ret = s->text + s->bias +
                           (sym[k].st_value - s->sh[s->text_off].sh_addr);
                     if (size != NULL) {
                         *size = (size_t)sym[k].st_size;
@@ -122,6 +148,6 @@ void dl_close(struct so *s)
 #ifndef MAP
     free(s->text);
 #else
-    munmap(s->text, s->sh[s->text_off].sh_size);
+    munmap(s->text, s->sh[s->text_off].sh_size + s->bias);
 #endif
 }
