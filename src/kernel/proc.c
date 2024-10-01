@@ -181,7 +181,6 @@ int wait(int *exitcode)
     // 1. return -1 if no children
     // [PITFALL] if one proc is writeing pstree,
     // list_empty would get incorrect result.
-wait_st:
     acquire_spinlock(&pstree_lock);
     if (list_empty(&p->children)) {
         Log("no children\n");
@@ -207,6 +206,7 @@ wait_st:
         ASSERT(chd->parent == p);
         ASSERT(chd->pid >= 0);
         Log("(%d): state %d\n", chd->pid, (int)chd->state);
+        acquire_sched_lock();
         if (chd->state == ZOMBIE) {
             // remove the child from children list
             list_remove(&chd->ptnode);
@@ -220,13 +220,15 @@ wait_st:
             // is described in exit, "2. clean up the resources"
             kfree_page(chd->kstack);
             kfree(chd);
+            release_sched_lock();
             break;
         }
+        release_sched_lock();
     }
     release_spinlock(&pstree_lock);
     if (ret < 0) {
         // not found, possibly accedential wakeup.
-        goto wait_st;
+        PANIC("no zombie found");
     }
 
     // NOTE: be careful of concurrency
@@ -244,7 +246,7 @@ NO_RETURN void exit(int code)
     // Want to ensure that proc woke up in wait can
     // see at least one zombie proc.
     acquire_spinlock(&pstree_lock);
-    p->state = ZOMBIE;
+    // p->state = ZOMBIE;
     p->exitcode = code;
     // 2. clean up the resources
     // shold not call kfree_page, for later
@@ -260,11 +262,13 @@ NO_RETURN void exit(int code)
         list_push_back(&root_proc.children, e);
         struct Proc *chd = list_entry(e, struct Proc, ptnode);
         ASSERT(chd->state != UNUSED);
+        acquire_sched_lock();
         chd->parent = &root_proc;
         // if there is zombei proc, wakeup root proc.
         if (chd->state == ZOMBIE) {
             ++rootcnt;
         }
+        release_sched_lock();
     }
 
     // 3.1 wakeup its parent
@@ -273,15 +277,24 @@ NO_RETURN void exit(int code)
     if (p != parent) {
         post_sem(&parent->childexit);
     }
-    release_spinlock(&pstree_lock);
 
     // notify the root process of added children.
     for (int i = 0; i < rootcnt; i++) {
-        post_sem(&root_proc.childexit);
+        if (p != &root_proc)
+            post_sem(&root_proc.childexit);
     }
 
     // 4. sched(ZOMBIE)
     acquire_sched_lock();
+    // we have notified its parent and/or root proc that one of the child
+    // is ready. but BEFORE we set its state to zombie, the parent/root
+    // proc should NOT read its state. this is done by preempting the
+    // sched lock and then release the pstree_lock.
+
+    // release pstree lock allows parent/root to scan its children,
+    // but they will have to acquire the sched lock, at which time
+    // they can see the zombie state of thisproc().
+    release_spinlock(&pstree_lock);
     sched(ZOMBIE);
     // will not reach
     // NOTE: be careful of concurrency

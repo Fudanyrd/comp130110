@@ -46,9 +46,6 @@ static void rt_entry()
 // code executed by parent proc
 static void pr_entry()
 {
-    for (int i = 0; i < NCHD; i++) {
-        set_parent_to_this(children[i]);
-    }
     wait_sem(&sema);
     exit(0);
 }
@@ -73,8 +70,9 @@ void test_init()
     for (int i = 0; i < NCHD; i++) {
         children[i] = create_proc();
         ASSERT(children[i] != NULL);
+        children[i]->parent = pr;
+        list_push_back(&pr->children, &children[i]->ptnode);
         start_proc(children[i], chd_entry, 0);
-        ASSERT(children[i]->parent == &root_proc);
     }
     ASSERT(root_proc.childexit.val == 0);
 }
@@ -87,5 +85,8 @@ void run_test()
     if (cpuid() == 0) {
         printk("proc reparent test\n");
     }
+    // enable trap
+    set_cpu_on();
+    _arch_enable_trap();
     yield();
 }

@@ -55,6 +55,9 @@ void test_init()
 
 void run_test(void)
 {
+    // enable trap
+    set_cpu_on();
+    _arch_enable_trap();
     if (cpuid() == 0) {
         printk("third proc reparent test\n");
     }

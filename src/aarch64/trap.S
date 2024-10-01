@@ -37,13 +37,13 @@ trap_entry:
     str x28, [sp, #224]
     str lr,  [sp, #232]
     str fp,  [sp, #240]
-    mov sp, x0
+    mov x0, sp
     str x0,  [sp, #248]
-    msr spsr_el1, x0
+    mrs x0, spsr_el1
     str x0, [sp, #256]
-    msr elr_el1, x0
+    mrs x0, elr_el1
     str x0, [sp, #264]
-    mov sp, x0
+    mov x0, sp
 
     bl trap_global_handler
 
@@ -85,6 +85,7 @@ trap_return:
     msr spsr_el1, x0
     ldr x0,  [sp, #264]
     msr elr_el1, x0
+    ldr x0,  [sp, #0]
     add sp, sp, #272
 
     eret

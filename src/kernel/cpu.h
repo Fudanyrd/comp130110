@@ -19,6 +19,8 @@ struct cpu {
     struct sched sched;
     struct Proc *proc; // currently running proc
     struct Proc *idle; // idle proc
+    int noff; // depth of push_off()
+    int intena; // interrupt enabled
 };
 
 extern struct cpu cpus[NCPU];
@@ -26,6 +28,8 @@ extern struct Proc idleproc[NCPU];
 
 void set_cpu_on();
 void set_cpu_off();
+void push_off();
+void pop_off();
 
 /** Returns current cpu. */
 static inline struct cpu *mycpu(void)
