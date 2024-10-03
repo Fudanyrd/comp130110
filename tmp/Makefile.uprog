@@ -1,14 +1,14 @@
 src = sysutil.c shell.c
 CC = gcc
 CFLAGS = -g -static 
-all: uprog
+uprog = hello argls echo
+all: $(uprog)
 
 # My own libc
 include libc/Makefile
 
 # "User programs"
 usr_objs = argls.o echo.o
-uprog = hello argls echo
 uprog: $(libc_objs) $(usr_objs)
 
 CFLAGS += -ffreestanding -fno-common -nostdlib -fno-pie -no-pie -MD -I./libc 

@@ -14,6 +14,8 @@ OBJS = dl.o load-dl.o
 
 obj: obj.c
 	gcc -g obj.c -o obj
+elf: elfinfo.c
+	gcc -g elfinfo.c -o elf
 
 #fact.so: fact.c
 #	gcc -shared -g fact.c -o fact.so
