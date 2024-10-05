@@ -27,6 +27,7 @@ struct elf_info {
 void elf_open(const char *fname, struct elf_info *ei)
 {
     assert(ei != NULL);
+    ei->text = NULL;
     int fd = open(fname, O_RDONLY);
     assert(fd >= 0);
 
@@ -52,11 +53,11 @@ void elf_open(const char *fname, struct elf_info *ei)
             }
             if (p->p_flags & PF_W) {
                 // writable, do not load
-                continue;
+                prot |= PROT_WRITE;
             }
 
-            void *expected = (void *)Round(p->p_vaddr, p->p_align);
-            void *ret = mmap((void *)Round(p->p_vaddr, p->p_align),
+            void *expected = ei->text + Round(p->p_vaddr, p->p_align);
+            void *ret = mmap(expected,
                              p->p_memsz + (uintptr_t)p->p_vaddr % p->p_align,
                              prot,
                              MAP_PRIVATE | (expected == NULL ? 0 : MAP_FIXED),
@@ -139,6 +140,20 @@ void *elf_sym(const char *name, struct elf_info *ei)
     return ret;
 }
 
+void *elf_sec(const char *name, struct elf_info *ei, size_t *size)
+{
+    char *ret = NULL;
+    for (Elf64_Half i = 0; i < ei->eh->e_shnum; i++) {
+        Elf64_Shdr *s = &ei->sh[i];
+        if (strcmp(name, ei->shstrtab + s->sh_name) == 0) {
+            *size = (size_t)s->sh_size;
+            ret = ei->text + s->sh_addr;
+        }
+    }
+
+    return ret;
+}
+
 void elf_close(struct elf_info *ei)
 {
     munmap(ei->eh, 4096);
@@ -160,19 +175,24 @@ int main(int argc, char **argv)
     int (*bar)(int);
     foo = elf_sym("foo", &ei);
     bar = elf_sym("bar", &ei);
-    printf("%p %p\n", foo, bar);
+    size_t gotsz;
+    char *got = elf_sec(".got.plt", &ei, &gotsz);
+    // relocate some symbols
+    *(void **)(got + 0x20) = (void *)foo;
+    *(void **)(got + 0x28) = (void *)bar;
+    printf("%p %p %p\n", foo, bar, got);
     printf("0x%x, 0x%x\n", foo(0x12345678), bar(0x12345678));
-    elf_close(&ei);
 
-    // load another lib
-    elf_open("fact-recur.so", &ei);
-    uint64_t (*fact)(uint32_t);
-    fact = elf_sym("fact", &ei);
-    for (uint32_t i = 4; i < 9; i++) {
-        printf("%ld, ", fact(i));
-    }
+    int (*baz)(int);
+    baz = elf_sym("baz", &ei);
+    printf("%p\n", baz);
+    // use and then recover x16
+    uint64_t x16;
+    asm volatile("mov %0, x16" : "=r"(x16));
+    printf("0x%x, 0x%x\n", baz(0x12345678), baz(0x12345678));
+    asm volatile("mov x16, %0" : : "r"(x16));
+
     elf_close(&ei);
-    putchar('\n');
 
     return 0;
 }
