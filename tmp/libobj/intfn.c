@@ -11,3 +11,8 @@ __attribute__((noinline)) int bar(int n)
 {
     return n & 4095;
 }
+
+int baz(int n)
+{
+    return foo(n) + bar(n);
+}
