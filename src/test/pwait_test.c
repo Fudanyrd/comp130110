@@ -6,6 +6,13 @@
 
 static struct Proc *pfoo, *pbar, *ppr;
 
+static inline void set_parent(Proc *parent, Proc *child)
+{
+    ASSERT(child->parent == NULL);
+    child->parent = parent;
+    list_push_back(&parent->children, &child->ptnode);
+}
+
 static void proc_foo(u64 unused __attribute__((unused)))
 {
     // now no release_sched_lock is call in
@@ -35,9 +42,6 @@ static void proc_bar(u64 unused __attribute__((unused)))
 static void proc_pr(u64 unused __attribute__((unused)))
 {
     int code;
-    // set parent of foo, bar to parent.
-    set_parent_to_this(pfoo);
-    set_parent_to_this(pbar);
 
     for (int i = 0; i < 2; i++) {
         int pid = wait(&code);
@@ -55,6 +59,9 @@ void test_init(void)
     pfoo = create_proc();
     pbar = create_proc();
     ppr = create_proc();
+    set_parent(ppr, pfoo);
+    set_parent(ppr, pbar);
+
     ASSERT(pfoo != NULL && pbar != NULL);
     start_proc(pfoo, proc_foo, 0);
     start_proc(pbar, proc_bar, 0);

@@ -16,6 +16,13 @@ static struct Proc *pr;
 static void proc_pr(u64 nchd);
 static void proc_chd(u64 code __attribute__((unused)));
 
+static inline void set_parent(Proc *parent, Proc *child)
+{
+    ASSERT(child->parent == NULL);
+    child->parent = parent;
+    list_push_back(&parent->children, &child->ptnode);
+}
+
 void test_init(void)
 {
     pr = create_proc();
@@ -23,6 +30,7 @@ void test_init(void)
     for (int i = 0; i < NCHLD; i++) {
         children[i] = create_proc();
         ASSERT(children[i] != NULL);
+        set_parent(pr, children[i]);
     }
     start_proc(pr, proc_pr, (u64)NCHLD);
     for (int i = 0; i < NCHLD; i++) {
@@ -36,9 +44,14 @@ static void proc_pr(u64 nchd)
     int code;
     // check param passing
     ASSERT(nchd == NCHLD);
+#if 0
+    // set parent relationship at run time 
+    // is problematic for the child may exit 
+    // earlier and belongs to root's child.
     for (int i = 0; i < NCHLD; i++) {
         set_parent_to_this(children[i]);
     }
+#endif
     // set parent of foo, bar to parent.
 
     for (int i = 0; i < NCHLD; i++) {
