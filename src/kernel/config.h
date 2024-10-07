@@ -19,4 +19,7 @@
  */
 #define RCC
 
+/** It does not perform well on rcc_test. Not set. */
+#undef RCC
+
 #endif // __KERNEL_CONFIG_
