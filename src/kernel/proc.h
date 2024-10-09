@@ -4,6 +4,7 @@
 #include <common/list.h>
 #include <common/sem.h>
 #include <common/rbtree.h>
+#include <kernel/config.h>
 
 #include <fdutil/stdint.h>
 #include <fdutil/stddef.h>
@@ -75,9 +76,22 @@ typedef struct KernelContext {
 } KernelContext;
 
 // embeded data for procs
+#ifndef RCC
 struct schinfo {
     // TODO: customize your sched info
 };
+#else
+/** Scheduler information */
+struct schinfo {
+    uint32_t coreid; /** cpu it is currently running */
+    uint32_t bitmap; /** record scheduled cpu id */
+};
+
+/** Update scheduler information, which is done in sched().
+ * @return the next cpu to run.
+ */
+int update_schinfo(struct schinfo *sch);
+#endif
 
 typedef struct Proc {
     // must held lock when accessing these

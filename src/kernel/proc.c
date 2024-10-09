@@ -119,6 +119,13 @@ void init_proc(Proc *p)
     // released in exit().
     p->kstack = kalloc_page();
     p->ucontext = NULL;
+
+    // init scheduler info here
+#ifdef RCC
+    ASSERT(p->pid >= 0);
+    p->schinfo.coreid = p->pid % NCPU;
+    p->schinfo.bitmap = 0;
+#endif
 }
 
 Proc *create_proc()

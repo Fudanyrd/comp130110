@@ -12,8 +12,13 @@
  * the lock. */
 static SpinLock sched_lock;
 
+#ifndef RCC
 /** Scheduler queue */
 static struct list queue;
+#else
+/** Scheduler queues for all cores */
+static struct list queue[NCPU];
+#endif
 
 extern bool panic_flag;
 
@@ -24,7 +29,13 @@ void init_sched()
     // TODO: initialize the scheduler
     // 1. initialize the resources (e.g. locks, semaphores)
     init_spinlock(&sched_lock);
+#ifndef RCC
     list_init(&queue);
+#else
+    for (int i = 0; i < NCPU; i++) {
+        list_init(&queue[i]);
+    }
+#endif
 
     // 2. initialize the scheduler info of each CPU
     for (int i = 0; i < NCPU; i++) {
@@ -54,7 +65,31 @@ Proc *thisproc()
 void init_schinfo(struct schinfo *p)
 {
     // TODO: initialize your customized schinfo for every newly-created process
+    // Note to TA: since the initialization of schinfo relies
+    // on the proc's id, it is done in proc.c
 }
+
+#ifdef RCC
+int update_schinfo(struct schinfo *sch)
+{
+    // this process is similar to clock algorithm
+    ASSERT(sch->coreid < NCPU);
+    while (1) {
+        if ((sch->bitmap & (1U << sch->coreid)) != 0) {
+            // clear this scheduled bit.
+            // this means that we notice the proc is once scheduled
+            // on the core, so don't run on it again.
+            sch->bitmap &= ~(1U << sch->coreid);
+        } else {
+            // this bit is not set, meaning that the proc
+            // has not be scheduled on that core. so return that.
+            return sch->coreid;
+        }
+        // set the position of the frame pointer
+        sch->coreid = (sch->coreid + 1) % NCPU;
+    }
+}
+#endif
 
 void acquire_sched_lock()
 {
@@ -95,7 +130,14 @@ bool activate_proc(Proc *p)
     case (UNUSED): {
         p->state = RUNNABLE;
         // push operation is atomic.
+#ifndef RCC
         list_push_back(&queue, &p->schq);
+#else
+        // I believe before the proc is deactivated,
+        // it calls sched() which updates its schinfo.
+        // so no update is done here.
+        list_push_back(&queue[p->schinfo.coreid], &p->schq);
+#endif
         break;
     }
     default: {
@@ -118,6 +160,13 @@ static void update_this_state(enum procstate new_state)
     struct Proc *p = thisproc();
     p->state = new_state;
 
+#ifdef RCC
+    // compute the next core to run the proc.
+    if (!p->idle) {
+        update_schinfo(&p->schinfo);
+    }
+#endif
+
     switch (new_state) {
     case (RUNNING): {
         PANIC("update to running");
@@ -132,7 +181,11 @@ static void update_this_state(enum procstate new_state)
         // no need to remove from queue,
         // since it is done in pick_next().
         if (!p->idle) {
+#ifndef RCC
             list_push_back(&queue, &p->schq);
+#else
+            list_push_back(&queue[p->schinfo.coreid], &p->schq);
+#endif // RCC
         }
         break;
     }
@@ -152,11 +205,44 @@ static Proc *pick_next()
 {
     // TODO: if using template sched function, you should implement this routinue
     // choose the next process to run, and return idle if no runnable process
+#ifndef RCC
     if (list_empty(&queue)) {
         return mycpu()->idle;
     }
     struct list_elem *e = list_pop_front(&queue);
     return list_entry(e, struct Proc, schq);
+#else
+    const int cid = cpuid();
+    if (list_empty(&queue[cid])) {
+        // "steal" one proc from other cpu's scheduler queue(?!)
+        // if it is not done, some cores at sometime may have
+        // no job to run, which is a waste of computation power.
+        // It may not also be run with less than 4 cores.
+
+        // it is safe to do so for we already acquired
+        // the sched lock.
+        for (int i = 1; i < NCPU; i++) {
+            const int qid = (cid + i) % NCPU;
+            if (!list_empty(&queue[qid])) {
+                struct list_elem *e = list_pop_front(&queue[qid]);
+                Proc *p = list_entry(e, struct Proc, schq);
+                // update its bitmap, this will
+                // lower the possibility that it will be scheduled
+                // on the same cpu.
+                p->schinfo.bitmap |= (1U << cid);
+                return p;
+            }
+        }
+        return mycpu()->idle;
+    }
+    // get a proc from its own scheduler queue
+    struct list_elem *e = list_pop_front(&queue[cid]);
+    struct Proc *p = list_entry(e, struct Proc, schq);
+    // mark the cpu as scheduled.
+    p->schinfo.bitmap |= (1U << cid);
+    p->schinfo.coreid = (cid + 1) % NCPU;
+    return p;
+#endif
 }
 
 // update the result of `thisproc` to p.
