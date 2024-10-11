@@ -9,6 +9,7 @@
 #include <fdutil/stdint.h>
 #include <fdutil/stddef.h>
 #include <fdutil/lst.h>
+#include <kernel/pt.h>
 
 enum procstate { UNUSED, RUNNABLE, RUNNING, SLEEPING, ZOMBIE };
 
@@ -108,6 +109,7 @@ typedef struct Proc {
     enum procstate state;
     Semaphore childexit;
     struct schinfo schinfo;
+    struct pgdir pgdir;
     void *kstack;
     KernelContext kcontext;
     UserContext *ucontext;
@@ -121,3 +123,4 @@ void set_parent_to_this(Proc *proc);
 int start_proc(Proc *, void (*entry)(u64), u64 arg);
 NO_RETURN void exit(int code);
 int wait(int *exitcode);
+int kill(int pid);

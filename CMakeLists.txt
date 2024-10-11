@@ -51,7 +51,7 @@ set(qemu_unic_flags
     -kernel "${kernel_elf}")
 
 add_custom_target(qemu
-    COMMAND ${aarch64_qemu} ${qemu_flags}
+    COMMAND ${aarch64_qemu} ${qemu_flags} -gdb tcp::1234
     DEPENDS image)
 add_custom_target(qemu-unic 
     COMMAND ${aarch64_qemu} ${qemu_unic_flags}

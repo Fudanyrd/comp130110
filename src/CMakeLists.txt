@@ -36,14 +36,15 @@ add_subdirectory(common)
 add_subdirectory(kernel)
 add_subdirectory(fdutil)
 add_subdirectory(driver)
+add_subdirectory(user)
 add_subdirectory(test)
 
 set(kernel_name kernel8)
 add_executable(${kernel_name}.elf main.c start.S)
-target_link_libraries(${kernel_name}.elf test kernelx driver common aarch64 fdutil)
+target_link_libraries(${kernel_name}.elf test kernelx driver common aarch64 fdutil user)
 
 # tests, do not mix up every test cases into kernel
-set(testlib test_util kernelx driver common aarch64 fdutil)
+set(testlib test_util kernelx driver common aarch64 fdutil user)
 set(kmain test_main.c start.S)
 
 foreach(tcase IN LISTS tcases)

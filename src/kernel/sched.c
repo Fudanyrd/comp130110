@@ -114,6 +114,15 @@ bool is_zombie(Proc *p)
 
 // activate process p.
 // in the inside will hold sched_lock.
+bool is_unused(Proc *p)
+{
+    bool r;
+    acquire_sched_lock();
+    r = p->state == UNUSED;
+    release_sched_lock();
+    return r;
+}
+
 bool activate_proc(Proc *p)
 {
     // TODO:
@@ -269,6 +278,7 @@ void sched(enum procstate new_state)
     mycpu()->proc = next;
     next->state = RUNNING;
     if (next != this) {
+        attach_pgdir(&next->pgdir);
         swtch(&this->kcontext, &next->kcontext);
     }
     release_sched_lock();
