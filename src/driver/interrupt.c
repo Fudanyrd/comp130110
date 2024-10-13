@@ -40,4 +40,7 @@ void interrupt_global_handler()
 
     if (int_handler[intid])
         int_handler[intid](intid);
+    if (intid == TIMER_IRQ) {
+        yield();
+    }
 }

@@ -334,7 +334,7 @@ NO_RETURN void exit(int code)
 static Proc *find_proc_from(int pid, Proc *parent)
 {
     ASSERT(parent != NULL);
-    if (parent->pid == pid && is_unused(parent)) {
+    if (parent->pid == pid && !is_unused(parent)) {
         return parent;
     }
 
@@ -375,6 +375,7 @@ int kill(int pid)
 
     if (p != NULL) {
         p->killed = 1;
+        activate_proc(p);
         return 0;
     }
     return -1;

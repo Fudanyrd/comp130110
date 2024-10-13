@@ -150,7 +150,10 @@ bool activate_proc(Proc *p)
         break;
     }
     default: {
-        PANIC("activate zombie proc");
+        // PANIC("activate zombie proc");
+        // handout change
+        release_spinlock(&sched_lock);
+        return false;
     }
     }
     release_spinlock(&sched_lock);
@@ -271,6 +274,7 @@ void sched(enum procstate new_state)
     auto this = thisproc();
     // by handout, the scheduler should return.
     if (this->killed && new_state != ZOMBIE) {
+        release_sched_lock();
         return;
     }
     ASSERT(this->state == RUNNING || this->state == ZOMBIE);
