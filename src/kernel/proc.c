@@ -119,6 +119,8 @@ void init_proc(Proc *p)
     // released in exit().
     p->kstack = kalloc_page();
     p->ucontext = NULL;
+    // initialize page table
+    init_pgdir(&p->pgdir);
 
     // init scheduler info here
 #ifdef RCC
@@ -176,6 +178,26 @@ int start_proc(Proc *p, void (*entry)(u64), u64 arg)
     p->state = UNUSED;
     activate_proc(p);
     // NOTE: be careful of concurrency
+    return p->pid;
+}
+
+/** Start a proc with kcontext already setup. 
+ * @return the proc's pid.
+ */
+int start_with_kcontext(Proc *p)
+{
+    // 1. set parent to root if null.
+    if (p->parent == NULL) {
+        acquire_spinlock(&pstree_lock);
+        p->parent = &root_proc;
+        list_push_back(&root_proc.children, &p->ptnode);
+        release_spinlock(&pstree_lock);
+    }
+    // 2. activate the proc and return its pid.
+    //    it is your job to make sure the kcontext is already setup.
+    ASSERT(p->kstack != NULL);
+    p->state = UNUSED;
+    activate_proc(p);
     return p->pid;
 }
 
@@ -309,10 +331,51 @@ NO_RETURN void exit(int code)
     PANIC(); // prevent the warning of 'no_return function returns'
 }
 
+static Proc *find_proc_from(int pid, Proc *parent)
+{
+    ASSERT(parent != NULL);
+    if (parent->pid == pid && is_unused(parent)) {
+        return parent;
+    }
+
+    if (list_empty(&parent->children)) {
+        return NULL;
+    }
+
+    struct list_elem *e;
+    struct Proc *p;
+    struct Proc *ret;
+    for (e = list_begin(&parent->children); e != list_end(&parent->children);
+         e = list_next(e)) {
+        p = list_entry(e, struct Proc, ptnode);
+        ret = find_proc_from(pid, p);
+        if (ret != NULL) {
+            return ret;
+        }
+    }
+    return NULL;
+}
+
+/** Find the proc with pid. Must hold pstree_lock.
+ * @return NULL if not found.
+ */
+static Proc *find_proc(int pid)
+{
+    return find_proc_from(pid, &root_proc);
+}
+
 int kill(int pid)
 {
     // TODO:
     // Set the killed flag of the proc to true and return 0.
     // Return -1 if the pid is invalid (proc not found).
-    return pid - 1;
+    acquire_spinlock(&pstree_lock);
+    Proc *p = find_proc(pid);
+    release_spinlock(&pstree_lock);
+
+    if (p != NULL) {
+        p->killed = 1;
+        return 0;
+    }
+    return -1;
 }

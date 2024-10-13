@@ -5,7 +5,8 @@
 #include <aarch64/mmu.h>
 
 /** Returns a page filled with 0 */
-static inline void *pte_page(void) {
+static inline void *pte_page(void)
+{
     void *ret = kalloc_page();
     ASSERT(ret != NULL);
     memset(ret, 0, PAGE_SIZE);
@@ -13,14 +14,16 @@ static inline void *pte_page(void) {
 }
 
 /** Returns the level 0 table index */
-static inline u64 pte_idx_lv0(u64 va) {
+static inline u64 pte_idx_lv0(u64 va)
+{
     // bit [47:39]
     u64 ret = VA_PART0(va);
     ASSERT(ret < N_PTE_PER_TABLE);
     return ret;
 }
 /** Returns the level 1 table index */
-static inline u64 pte_idx_lv1(u64 va) {
+static inline u64 pte_idx_lv1(u64 va)
+{
     // bit [38:30]
     u64 ret = VA_PART1(va);
     ASSERT(ret < N_PTE_PER_TABLE);
@@ -28,14 +31,16 @@ static inline u64 pte_idx_lv1(u64 va) {
 }
 
 /** Returns the level 2 table index */
-static inline u64 pte_idx_lv2(u64 va) {
+static inline u64 pte_idx_lv2(u64 va)
+{
     // bit [29:21]
     u64 ret = VA_PART2(va);
     ASSERT(ret < N_PTE_PER_TABLE);
     return ret;
 }
 /** Returns the level 3 table index */
-static inline u64 pte_idx_lv3(u64 va) {
+static inline u64 pte_idx_lv3(u64 va)
+{
     // bit [20:12]
     u64 ret = VA_PART3(va);
     ASSERT(ret < N_PTE_PER_TABLE);
@@ -50,7 +55,7 @@ PTEntriesPtr get_pte(struct pgdir *pgdir, u64 va, bool alloc)
     // THIS ROUTINUE GETS THE PTE, NOT THE PAGE DESCRIBED BY PTE.
     ASSERT(pgdir != NULL);
 
-    // at each level, based on alloc is true or not, 
+    // at each level, based on alloc is true or not,
     // do the following: allocate page for this level,
     // and compute the index to the next level.
 
@@ -92,7 +97,7 @@ PTEntriesPtr get_pte(struct pgdir *pgdir, u64 va, bool alloc)
         ptlv1 = (PTEntry *)(P2K(ptlv1) & (~PTE_TABLE));
     }
     const u64 lv2 = pte_idx_lv2(va);
-    PTEntry *ptlv2 = (PTEntry *) ptlv1[lv2];
+    PTEntry *ptlv2 = (PTEntry *)ptlv1[lv2];
 
     // at level 3, bit [20:12]
     if (ptlv2 == NULL) {

@@ -1,5 +1,6 @@
 #include <test/test.h>
 #include <common/rc.h>
+#include <common/string.h>
 #include <kernel/pt.h>
 #include <kernel/mem.h>
 #include <kernel/printk.h>
@@ -58,6 +59,9 @@ u64 syscall_myreport(u64 id)
     return 0;
 }
 
+extern int start_with_kcontext(Proc *p);
+extern u64 proc_entry(void (*entry)(u64), u64 arg);
+
 void user_proc_test()
 {
     printk("user_proc_test\n");
@@ -72,12 +76,28 @@ void user_proc_test()
         }
         ASSERT(p->pgdir.pt);
 
+        // setup the kernel context
+        // you can reference to proc.c: start_proc
+        memset(&p->kcontext, 0, sizeof(KernelContext));
+        // make room for user context on the stack.
+        p->kcontext.sp = (uintptr_t)(p->kstack + PAGE_SIZE);
+        p->kcontext.sp -= sizeof(UserContext);
+        ASSERT(p->kcontext.sp % 0x10 == 0);
+        p->kcontext.lr = (uintptr_t)proc_entry;
+        p->kcontext.x1 = 0;
+        p->kcontext.x0 = (uint64_t)trap_return;
         // TODO: setup the user context
         // 1. set x0 = i
         // 2. set elr = EXTMEM
         // 3. set spsr = 0
+        UserContext *uc = (void *)p->kcontext.sp;
+        memset(uc, 0, sizeof(UserContext));
+        uc->x0 = i;
+        uc->spsr = 0;
+        uc->elr = EXTMEM;
 
-        pids[i] = start_proc(p, trap_return, 0);
+        // pids[i] = start_proc(p, trap_return, 0);
+        pids[i] = start_with_kcontext(p);
         printk("pid[%d] = %d\n", i, pids[i]);
     }
     ASSERT(wait_sem(&myrepot_done));
