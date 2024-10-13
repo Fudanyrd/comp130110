@@ -36,11 +36,11 @@ void interrupt_global_handler()
         return;
     }
 
-    if (int_handler[intid])
-        int_handler[intid](intid);
-
     gic_eoi(iar);
 
-    if (intid == TIMER_IRQ)
+    if (int_handler[intid])
+        int_handler[intid](intid);
+    if (intid == TIMER_IRQ) {
         yield();
+    }
 }

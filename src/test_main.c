@@ -56,8 +56,6 @@ void main()
 
         gicv3_init();
         gicv3_init_percpu();
-        timer_init(1000);
-        timer_init_percpu();
         smp_init();
 
         // boot shutdown module
@@ -85,7 +83,6 @@ void main()
         while (!boot_secondary_cpus)
             ;
         arch_fence();
-        timer_init_percpu();
         gicv3_init_percpu();
 
         // start running test

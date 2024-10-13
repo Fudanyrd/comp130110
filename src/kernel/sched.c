@@ -114,6 +114,15 @@ bool is_zombie(Proc *p)
 
 // activate process p.
 // in the inside will hold sched_lock.
+bool is_unused(Proc *p)
+{
+    bool r;
+    acquire_sched_lock();
+    r = p->state == UNUSED;
+    release_sched_lock();
+    return r;
+}
+
 bool activate_proc(Proc *p)
 {
     // TODO:
@@ -141,7 +150,10 @@ bool activate_proc(Proc *p)
         break;
     }
     default: {
-        PANIC("activate zombie proc");
+        // PANIC("activate zombie proc");
+        // handout change
+        release_spinlock(&sched_lock);
+        return false;
     }
     }
     release_spinlock(&sched_lock);
@@ -260,6 +272,11 @@ static void update_this_proc(Proc *p)
 void sched(enum procstate new_state)
 {
     auto this = thisproc();
+    // by handout, the scheduler should return.
+    if (this->killed && new_state != ZOMBIE) {
+        release_sched_lock();
+        return;
+    }
     ASSERT(this->state == RUNNING || this->state == ZOMBIE);
     update_this_state(new_state);
     auto next = pick_next();
@@ -269,6 +286,7 @@ void sched(enum procstate new_state)
     mycpu()->proc = next;
     next->state = RUNNING;
     if (next != this) {
+        attach_pgdir(&next->pgdir);
         swtch(&this->kcontext, &next->kcontext);
     }
     release_sched_lock();
