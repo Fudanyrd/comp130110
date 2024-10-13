@@ -278,6 +278,7 @@ NO_RETURN void exit(int code)
     // p->state = ZOMBIE;
     p->exitcode = code;
     // 2. clean up the resources
+    free_pgdir(&p->pgdir);
     // shold not call kfree_page, for later
     // sched() will store the context!
     // That will be use-after-free.
