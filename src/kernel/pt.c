@@ -47,6 +47,37 @@ static inline u64 pte_idx_lv3(u64 va)
     return ret;
 }
 
+static PTEntry *pte_walk(PTEntry *table, u64 va, int lv, bool alloc)
+{
+    typedef u64 (*idx_fn)(u64);
+    static idx_fn indices[4] = {
+        pte_idx_lv0,
+        pte_idx_lv1,
+        pte_idx_lv2,
+        pte_idx_lv3,
+    };
+
+    ASSERT(lv < 4);
+    // check table is not null and page aligned.
+    ASSERT(table != NULL);
+    ASSERT(((u64)table & 0xfff) == 0);
+    const u64 index = indices[lv](va);
+
+    if (lv == 3) {
+        return &table[index];
+    }
+    PTEntry *next = (PTEntry *)(P2K(table[index]) & (~PTE_TABLE));
+    if (table[index] == 0x0) {
+        if (alloc) {
+            next = pte_page();
+            table[index] = K2P(next) | PTE_TABLE;
+        } else {
+            return NULL;
+        }
+    }
+    return pte_walk(next, va, lv + 1, alloc);
+}
+
 PTEntriesPtr get_pte(struct pgdir *pgdir, u64 va, bool alloc)
 {
     // TODO:
@@ -67,6 +98,8 @@ PTEntriesPtr get_pte(struct pgdir *pgdir, u64 va, bool alloc)
             return NULL;
         }
     }
+    return pte_walk(pgdir->pt, va, 0, alloc);
+#ifdef DISCARDED
     const u64 lv0 = pte_idx_lv0(va);
     PTEntry *ptlv0 = (PTEntry *)(pgdir->pt[lv0] & (~PTE_TABLE));
 
@@ -112,6 +145,7 @@ PTEntriesPtr get_pte(struct pgdir *pgdir, u64 va, bool alloc)
     }
     const u64 lv3 = pte_idx_lv3(va);
     return &ptlv2[lv3];
+#endif
 }
 
 void init_pgdir(struct pgdir *pgdir)
