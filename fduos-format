@@ -20,13 +20,13 @@ def getfn():
         capture_output=True
     )
 
-    res += str(code.stdout).split('\\n')
+    res += code.stdout.decode().split('\n')
     code = subprocess.run(
         "find -name *.h",
         shell=True,
         capture_output=True
     )
-    res += str(code.stdout).split('\\n')
+    res += code.stdout.decode().split('\n')
 
     return res;
 
@@ -34,4 +34,5 @@ if __name__ == "__main__":
     # format all source files
     fns = getfn() 
     for fn in fns:
-        format(fn)
+        if len(fn):
+            format(fn)

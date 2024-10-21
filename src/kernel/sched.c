@@ -12,6 +12,15 @@
  * the lock. */
 static SpinLock sched_lock;
 
+/** Scheduler timer for each core. */
+static struct timer sched_timer[NCPU];
+
+static void sched_handler(struct timer *timer)
+{
+    timer->triggered = false;
+    yield();
+}
+
 #ifndef RCC
 /** Scheduler queue */
 static struct list queue;
@@ -44,11 +53,16 @@ void init_sched()
         cpus[i].proc = NULL;
         cpus[i].noff = 0;
         // mark as idle thread
+        idleproc[i].killed = 0;
         idleproc[i].idle = 1;
         idleproc[i].state = RUNNING;
         idleproc[i].kstack = NULL;
         list_init(&idleproc[i].children);
         init_sem(&idleproc[i].childexit, 0);
+
+        sched_timer[i].triggered = false;
+        sched_timer[i].elapse = 10;
+        sched_timer[i].handler = sched_handler;
     }
 }
 
@@ -264,6 +278,11 @@ static void update_this_proc(Proc *p)
 {
     // TODO: you should implement this routinue
     // update thisproc to the choosen process
+    struct timer *timer = &sched_timer[cpuid()];
+    if (!timer->triggered) {
+        cancel_cpu_timer(timer);
+    }
+    set_cpu_timer(timer);
 }
 
 // A simple scheduler.
