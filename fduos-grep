@@ -11,13 +11,18 @@ def getfn():
         capture_output=True
     )
 
-    res += str(code.stdout).split('\\n')
+    #res += str(code.stdout).split('\\n')
+    for fn in code.stdout.decode().split('\n'):
+        if len(fn):
+            res.append(fn)
     code = subprocess.run(
         "find -name *.h",
         shell=True,
         capture_output=True
     )
-    res += str(code.stdout).split('\\n')
+    for fn in code.stdout.decode().split('\n'):
+        if len(fn):
+            res.append(fn)
 
     return res;
 
