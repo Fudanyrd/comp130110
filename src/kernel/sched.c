@@ -53,6 +53,7 @@ void init_sched()
         cpus[i].proc = NULL;
         cpus[i].noff = 0;
         // mark as idle thread
+        idleproc[i].killed = 0;
         idleproc[i].idle = 1;
         idleproc[i].state = RUNNING;
         idleproc[i].kstack = NULL;
