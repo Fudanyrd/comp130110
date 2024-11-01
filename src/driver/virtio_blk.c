@@ -4,6 +4,7 @@
 #include <common/buf.h>
 #include <common/sem.h>
 #include <common/string.h>
+#include <fdutil/stdint.h>
 #include <kernel/mem.h>
 #include <kernel/printk.h>
 
@@ -117,8 +118,11 @@ int virtio_blk_rw(Buf *b)
     arch_fence();
 
     while (!disk.virtq.info[d0].done) {
+        /* Take the semaphore lock, and then release the disk lock.
+          There's no deadlocks for disk.lk is always held first. */
         _lock_sem(&b->sem);
         release_spinlock(&disk.lk);
+        /* Will unlock b->sem.lock */
         _wait_sem(&b->sem);
         acquire_spinlock(&disk.lk);
     }
@@ -145,8 +149,14 @@ static void virtio_blk_intr()
 
         disk.virtq.info[d0].done = 1;
 
-        Buf *b = (Buf *)((u64)disk.virtq.info[d0].buf - sizeof(int));
-        post_sem(&b->sem);
+        /* Compute the address of the buffer. */
+        /* Note: the start address of the Buf struct is 
+           given in disk.virtq.info[d0].buf */
+        uintptr_t baddr = (uintptr_t)disk.virtq.info[d0].buf;
+        // void *offset = &(((Buf *)0x0)->data);
+        baddr -= offset_of(Buf, data);
+        Buf *buf = (Buf *)baddr;
+        post_sem(&buf->sem);
 
         disk.virtq.info[d0].buf = NULL;
         disk.virtq.last_used_idx++;
@@ -257,6 +267,4 @@ void virtio_init()
 
     set_interrupt_handler(VIRTIO_BLK_IRQ, virtio_blk_intr);
     init_spinlock(&disk.lk);
-
-    // printk("%lld\n", sb_base);
 }
