@@ -35,6 +35,8 @@ set(qemu_flags
     -monitor none
     -serial "mon:stdio"
     -global virtio-mmio.force-legacy=false
+    -drive file=${sd_image},if=none,format=raw,id=d0
+    -device virtio-blk-device,drive=d0,bus=virtio-mmio-bus.0
     -kernel "${kernel_elf}")
 
 # build qemu with 1(unique) CPU for debugging
