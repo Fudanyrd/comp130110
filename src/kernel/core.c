@@ -67,6 +67,13 @@ void init_mbr()
     struct mbr *mbr = (struct mbr *)(mbr_buf.data);
     ASSERT(mbr->magic_1 == 0x55);
     ASSERT(mbr->magic_2 == 0xaa);
+
+    /* Log the LBA of first absolute sector */
+    uint32_t *pt = (uint32_t *)((char *)mbr->partition_entr_2 + 0x8);
+    printk("LBA of partition 2: %u\n", *pt);
+    /* Log the number of sectors in the partition. */
+    pt++;
+    printk("# sectors of partition 2: %u\n", *pt);
 }
 
 struct mbr *this_mbr()
