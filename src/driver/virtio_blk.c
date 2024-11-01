@@ -64,7 +64,7 @@ int virtio_blk_rw(Buf *b)
     enum diskop op = DREAD;
     if (b->flags & B_DIRTY)
         op = DWRITE;
-    
+
     init_sem(&b->sem, 0);
 
     u64 sector = b->block_no;
