@@ -11,6 +11,7 @@ set(test_util_src
     range.c
     sync.c
     user_proc_test.c
+    io_test.c
 )
 add_library(test_util STATIC ${test_util_src})
 # make test a fake lib which does not run any test in reality.

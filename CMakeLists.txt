@@ -39,6 +39,8 @@ set(qemu_flags
     -device virtio-blk-device,drive=d0,bus=virtio-mmio-bus.0
     -kernel "${kernel_elf}")
 
+message(STATUS "Path to Disk Image: ${sd_image}")
+
 # build qemu with 1(unique) CPU for debugging
 # race conditions (partially) avoided
 set(qemu_unic_flags
