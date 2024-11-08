@@ -7,10 +7,12 @@
 extern void _fs_test_sleep(void *chan, SpinLock *lock);
 extern void _fs_test_wakeup(void *chan);
 
-void sleep(void *chan, SpinLock *lock) {
+void sleep(void *chan, SpinLock *lock)
+{
     _fs_test_sleep(chan, lock);
 }
 
-void wakeup(void *chan) {
+void wakeup(void *chan)
+{
     _fs_test_wakeup(chan);
 }

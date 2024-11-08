@@ -7,7 +7,8 @@
     @param[in] block_no the block number to read
     @param[out] buffer the buffer to store the data
  */
-static void sd_read(usize block_no, u8 *buffer) {
+static void sd_read(usize block_no, u8 *buffer)
+{
     Buf b;
     b.block_no = (u32)block_no;
     b.flags = 0;
@@ -21,7 +22,8 @@ static void sd_read(usize block_no, u8 *buffer) {
     @param[in] block_no the block number to write
     @param[in] buffer the buffer to store the data
  */
-static void sd_write(usize block_no, u8 *buffer) {
+static void sd_write(usize block_no, u8 *buffer)
+{
     Buf b;
     b.block_no = (u32)block_no;
     b.flags = B_DIRTY | B_VALID;
@@ -42,9 +44,13 @@ static u8 sblock_data[BLOCK_SIZE];
 
 BlockDevice block_device;
 
-void init_block_device() {
+void init_block_device()
+{
     block_device.read = sd_read;
     block_device.write = sd_write;
 }
 
-const SuperBlock *get_super_block() { return (const SuperBlock *)sblock_data; }
+const SuperBlock *get_super_block()
+{
+    return (const SuperBlock *)sblock_data;
+}

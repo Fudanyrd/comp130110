@@ -103,7 +103,8 @@ static void user_test()
         printk("Proc %d: %llu\n", i, proc_cnt[i]);
 }
 
-static void rt_entry() {
+static void rt_entry()
+{
     vm_test_cp();
     user_test();
     while (1) {
@@ -112,10 +113,12 @@ static void rt_entry() {
 }
 
 // for stand-alone testing
-void test_init() {
+void test_init()
+{
     extern Proc root_proc;
     root_proc.kcontext.x0 = (uint64_t)rt_entry;
 }
 
-void run_test() {
+void run_test()
+{
 }

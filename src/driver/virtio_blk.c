@@ -66,7 +66,6 @@ int virtio_blk_rw(Buf *b)
     if (b->flags & B_DIRTY)
         op = DWRITE;
 
-    
     init_sem(&b->sem, 0);
 
     u64 sector = b->block_no;
@@ -132,7 +131,7 @@ int virtio_blk_rw(Buf *b)
         acquire_spinlock(&disk.lk);
     }
     /* LAB 4 TODO 1 BEGIN */
-    
+
     /* LAB 4 TODO 1 END */
 
     disk.virtq.info[d0].done = 0;
@@ -166,7 +165,7 @@ static void virtio_blk_intr()
         Buf *buf = (Buf *)baddr;
         post_sem(&buf->sem);
         /* LAB 4 TODO 2 BEGIN */
-    
+
         /* LAB 4 TODO 2 END */
 
         disk.virtq.info[d0].buf = NULL;

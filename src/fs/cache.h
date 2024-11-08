@@ -106,7 +106,6 @@ typedef struct {
     usize ts;
 } OpContext;
 
-
 typedef struct {
     /**
         @return the number of cached blocks at this moment.

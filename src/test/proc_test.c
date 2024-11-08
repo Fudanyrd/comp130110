@@ -98,7 +98,7 @@ static void proc_test_1a(u64 a)
     case 9: {
         int x;
         for (int i = 0; i < 10; i++)
-           unalertable_wait_sem(&s5);
+            unalertable_wait_sem(&s5);
         for (int i = 0; i < 10; i++)
             post_sem(&s6);
         for (int i = 0; i < 10; i++)
@@ -155,7 +155,8 @@ void proc_test()
     printk("proc_test PASS\n");
 }
 
-static void rt_entry() {
+static void rt_entry()
+{
     proc_test();
     while (1) {
         yield();
@@ -163,10 +164,12 @@ static void rt_entry() {
 }
 
 // for stand-alone testing
-void test_init() {
+void test_init()
+{
     extern Proc root_proc;
     root_proc.kcontext.x0 = (uint64_t)rt_entry;
 }
 
-void run_test() {
+void run_test()
+{
 }
