@@ -154,3 +154,19 @@ void proc_test()
     ASSERT(t == 1048575);
     printk("proc_test PASS\n");
 }
+
+static void rt_entry() {
+    proc_test();
+    while (1) {
+        yield();
+    }
+}
+
+// for stand-alone testing
+void test_init() {
+    extern Proc root_proc;
+    root_proc.kcontext.x0 = (uint64_t)rt_entry;
+}
+
+void run_test() {
+}

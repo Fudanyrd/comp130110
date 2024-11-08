@@ -90,6 +90,5 @@ void main()
     }
 
     // shutdown the cpu, this will call
-    shutdown();
     set_return_addr(idle_entry);
 }

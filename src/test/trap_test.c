@@ -16,7 +16,8 @@ void run_test()
     }
     // enable trap
     set_cpu_on();
-    _arch_enable_trap();
+    bool ret __attribute__((unused));
+    ret = _arch_enable_trap();
 
     // generate trap!
     *(int *)0x0 = 0x12;

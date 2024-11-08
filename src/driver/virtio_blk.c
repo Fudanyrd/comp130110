@@ -4,10 +4,7 @@
 #include <common/buf.h>
 #include <common/sem.h>
 #include <common/string.h>
-<<<<<<< HEAD
 #include <fdutil/stdint.h>
-=======
->>>>>>> d38577de2c06c703330c3aa8e41e7e26539bd0e1
 #include <kernel/mem.h>
 #include <kernel/printk.h>
 
@@ -18,11 +15,8 @@ struct disk {
     struct virtq virtq;
 } disk;
 
-<<<<<<< HEAD
 usize sb_base = 0;
 
-=======
->>>>>>> d38577de2c06c703330c3aa8e41e7e26539bd0e1
 static void desc_init(struct virtq *virtq)
 {
     for (int i = 0; i < NQUEUE; i++) {
@@ -71,11 +65,8 @@ int virtio_blk_rw(Buf *b)
     enum diskop op = DREAD;
     if (b->flags & B_DIRTY)
         op = DWRITE;
-<<<<<<< HEAD
 
-=======
     
->>>>>>> d38577de2c06c703330c3aa8e41e7e26539bd0e1
     init_sem(&b->sem, 0);
 
     u64 sector = b->block_no;
@@ -127,21 +118,22 @@ int virtio_blk_rw(Buf *b)
     REG(VIRTIO_REG_QUEUE_NOTIFY) = 0;
     arch_fence();
 
-<<<<<<< HEAD
     while (!disk.virtq.info[d0].done) {
         /* Take the semaphore lock, and then release the disk lock.
           There's no deadlocks for disk.lk is always held first. */
         _lock_sem(&b->sem);
         release_spinlock(&disk.lk);
         /* Will unlock b->sem.lock */
-        _wait_sem(&b->sem);
+        if (!_wait_sem(&b->sem, false)) {
+            // failure
+            _unlock_sem(&b->sem);
+            return 1;
+        }
         acquire_spinlock(&disk.lk);
     }
-=======
     /* LAB 4 TODO 1 BEGIN */
     
     /* LAB 4 TODO 1 END */
->>>>>>> d38577de2c06c703330c3aa8e41e7e26539bd0e1
 
     disk.virtq.info[d0].done = 0;
     free_desc(&disk.virtq, d0);
@@ -163,7 +155,6 @@ static void virtio_blk_intr()
             PANIC();
         }
 
-<<<<<<< HEAD
         disk.virtq.info[d0].done = 1;
 
         /* Compute the address of the buffer. */
@@ -174,11 +165,9 @@ static void virtio_blk_intr()
         baddr -= offset_of(Buf, data);
         Buf *buf = (Buf *)baddr;
         post_sem(&buf->sem);
-=======
         /* LAB 4 TODO 2 BEGIN */
     
         /* LAB 4 TODO 2 END */
->>>>>>> d38577de2c06c703330c3aa8e41e7e26539bd0e1
 
         disk.virtq.info[d0].buf = NULL;
         disk.virtq.last_used_idx++;

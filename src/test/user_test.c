@@ -1,3 +1,6 @@
+/** This is the second test case written for lab 4.
+ * Good luck!
+ */
 #include <test/test.h>
 #include <common/rc.h>
 #include <common/string.h>
@@ -10,9 +13,15 @@
 #include <driver/memlayout.h>
 #include <kernel/sched.h>
 
-PTEntriesPtr get_pte(struct pgdir *pgdir, u64 va, bool alloc);
+extern void trap_return(u64);
+extern int start_with_kcontext(Proc *p);
+extern u64 proc_entry(void (*entry)(u64), u64 arg);
+extern PTEntriesPtr get_pte(struct pgdir *pgdir, u64 va, bool alloc);
+extern Semaphore myrepot_done;
 
-void vm_test()
+static u64 proc_cnt[22] = { 0 }, cpu_cnt[4] = { 0 };
+
+static void vm_test_cp()
 {
     printk("vm_test\n");
     static void *p[100000];
@@ -39,30 +48,7 @@ void vm_test()
     printk("vm_test PASS\n");
 }
 
-void trap_return(u64);
-
-static u64 proc_cnt[22] = { 0 }, cpu_cnt[4] = { 0 };
-Semaphore myrepot_done;
-
-u64 syscall_myreport(u64 id)
-{
-    static bool stop;
-    ASSERT(id < 22);
-    if (stop)
-        return 0;
-    proc_cnt[id]++;
-    cpu_cnt[cpuid()]++;
-    if (proc_cnt[id] > 12345) {
-        stop = true;
-        post_sem(&myrepot_done);
-    }
-    return 0;
-}
-
-extern int start_with_kcontext(Proc *p);
-extern u64 proc_entry(void (*entry)(u64), u64 arg);
-
-void user_proc_test()
+static void user_test()
 {
     printk("user_proc_test\n");
     init_sem(&myrepot_done, 0);
@@ -115,4 +101,21 @@ void user_proc_test()
         printk("CPU %d: %llu\n", i, cpu_cnt[i]);
     for (int i = 0; i < 22; i++)
         printk("Proc %d: %llu\n", i, proc_cnt[i]);
+}
+
+static void rt_entry() {
+    vm_test_cp();
+    user_test();
+    while (1) {
+        yield();
+    }
+}
+
+// for stand-alone testing
+void test_init() {
+    extern Proc root_proc;
+    root_proc.kcontext.x0 = (uint64_t)rt_entry;
+}
+
+void run_test() {
 }

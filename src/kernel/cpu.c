@@ -108,8 +108,9 @@ void set_cpu_off()
 void push_off()
 {
     struct cpu *cpu = &cpus[cpuid()];
+    bool disable __attribute__((unused));
     int old = (int)cpu->online;
-    _arch_disable_trap();
+    disable = _arch_disable_trap();
     ASSERT(cpu->noff >= 0);
     if (cpu->noff == 0) {
         cpu->intena = old;
@@ -119,10 +120,11 @@ void push_off()
 
 void pop_off()
 {
+    bool disable __attribute__((unused));
     struct cpu *cpu = &cpus[cpuid()];
     ASSERT(cpu->noff > 0);
     cpu->noff -= 1;
     if (cpu->noff == 0 && cpu->intena) {
-        _arch_enable_trap();
+        disable = _arch_enable_trap();
     }
 }

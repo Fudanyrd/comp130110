@@ -163,6 +163,15 @@ bool _activate_proc(Proc *p, bool onalert)
 #endif
         break;
     }
+    case (DEEPSLEEPING): {
+        if (onalert) {
+            return false;
+        } else {
+            p->state = RUNNABLE;
+            list_push_back(&queue, &p->schq);
+        }
+        break;
+    }
     default: {
         // PANIC("activate zombie proc");
         // handout change
@@ -220,6 +229,7 @@ static void update_this_state(enum procstate new_state)
         break;
     }
     case (ZOMBIE):
+    case (DEEPSLEEPING):
     case (SLEEPING): {
         // remove from the sched queue.
         // lock already held.

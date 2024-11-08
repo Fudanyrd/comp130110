@@ -222,7 +222,12 @@ int wait(int *exitcode)
     release_spinlock(&pstree_lock);
 
     // 2. wait for childexit
-    wait_sem(&p->childexit);
+    bool wait_ret = wait_sem(&p->childexit);
+    if (!wait_ret) {
+        // passive wakeup, maybe killed
+        return -1;
+    }
+
     // reacquire lock
     acquire_spinlock(&pstree_lock);
     // 3. if any child exits, clean it up and return its pid and exitcode
@@ -376,7 +381,10 @@ int kill(int pid)
 
     if (p != NULL) {
         p->killed = 1;
-        activate_proc(p);
+        // by doc, kill should use alert proc.
+        // ignore return value.
+        bool ret __attribute__((unused));
+        ret = alert_proc(p);
         return 0;
     }
     return -1;
