@@ -137,7 +137,7 @@ bool is_unused(Proc *p)
     return r;
 }
 
-bool activate_proc(Proc *p)
+bool _activate_proc(Proc *p, bool onalert)
 {
     // TODO:
     // if the proc->state is RUNNING/RUNNABLE, do nothing
@@ -163,6 +163,15 @@ bool activate_proc(Proc *p)
 #endif
         break;
     }
+    case (DEEPSLEEPING): {
+        if (onalert) {
+            return false;
+        } else {
+            p->state = RUNNABLE;
+            list_push_back(&queue, &p->schq);
+        }
+        break;
+    }
     default: {
         // PANIC("activate zombie proc");
         // handout change
@@ -172,6 +181,10 @@ bool activate_proc(Proc *p)
     }
     release_spinlock(&sched_lock);
     return true;
+    // TODO:(Lab5 new)
+    // if the proc->state is RUNNING/RUNNABLE, do nothing and return false
+    // if the proc->state is SLEEPING/UNUSED, set the process state to RUNNABLE, add it to the sched queue, and return true
+    // if the proc->state is DEEPSLEEPING, do nothing if onalert or activate it if else, and return the corresponding value.
 }
 
 // update state of current thread.
@@ -216,6 +229,7 @@ static void update_this_state(enum procstate new_state)
         break;
     }
     case (ZOMBIE):
+    case (DEEPSLEEPING):
     case (SLEEPING): {
         // remove from the sched queue.
         // lock already held.

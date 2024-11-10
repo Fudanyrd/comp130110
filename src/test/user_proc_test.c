@@ -42,7 +42,7 @@ void vm_test()
 void trap_return(u64);
 
 static u64 proc_cnt[22] = { 0 }, cpu_cnt[4] = { 0 };
-static Semaphore myrepot_done;
+Semaphore myrepot_done;
 
 u64 syscall_myreport(u64 id)
 {

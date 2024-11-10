@@ -1,4 +1,7 @@
 #include <aarch64/intrinsic.h>
+#include <common/buf.h>
+#include <driver/virtio.h>
+#include <kernel/core.h>
 #include <kernel/cpu.h>
 #include <kernel/printk.h>
 #include <kernel/sched.h>
@@ -26,9 +29,15 @@ NO_RETURN void idle_entry()
 NO_RETURN void kernel_entry()
 {
     printk("Hello world! (Core %lld)\n", cpuid());
+    init_mbr();
     // proc_test();
-    vm_test();
-    user_proc_test();
+    // vm_test();
+    // user_proc_test();
+    io_test();
+
+    /* LAB 4 TODO 3 BEGIN */
+
+    /* LAB 4 TODO 3 END */
 
     while (1)
         yield();
@@ -45,4 +54,34 @@ NO_INLINE NO_RETURN void _panic(const char *file, int line)
     }
     printk("Kernel PANIC invoked at %s:%d. Stopped.\n", file, line);
     arch_stop_cpu();
+}
+
+static Buf mbr_buf;
+
+void init_mbr()
+{
+    /* MBR is at the first 512 Bytes. */
+    STATIC_ASSERT(sizeof(struct mbr) == 512);
+    mbr_buf.flags = 0;
+    mbr_buf.block_no = 0;
+
+    virtio_blk_rw(&mbr_buf);
+
+    /* Verify the content of mbr: check magic */
+    struct mbr *mbr = (struct mbr *)(mbr_buf.data);
+    ASSERT(mbr->magic_1 == 0x55);
+    ASSERT(mbr->magic_2 == 0xaa);
+
+    /* Log the LBA of first absolute sector */
+    uint32_t *pt = (uint32_t *)((char *)mbr->partition_entr_2 + 0x8);
+    printk("LBA of partition 2: %u\n", *pt);
+    /* Log the number of sectors in the partition. */
+    pt++;
+    printk("# sectors of partition 2: %u\n", *pt);
+}
+
+struct mbr *this_mbr()
+{
+    struct mbr *mbr = (struct mbr *)(mbr_buf.data);
+    return mbr->magic_1 == 0x55 ? mbr : NULL;
 }

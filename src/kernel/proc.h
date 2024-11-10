@@ -11,7 +11,7 @@
 #include <fdutil/lst.h>
 #include <kernel/pt.h>
 
-enum procstate { UNUSED, RUNNABLE, RUNNING, SLEEPING, ZOMBIE };
+enum procstate { UNUSED, RUNNABLE, RUNNING, SLEEPING, DEEPSLEEPING, ZOMBIE };
 
 typedef struct UserContext {
     // TODO: customize your trap frame
@@ -118,9 +118,8 @@ typedef struct Proc {
 void init_kproc();
 void init_kproc_test();
 void init_proc(Proc *);
-Proc *create_proc();
-void set_parent_to_this(Proc *proc);
+WARN_RESULT Proc *create_proc();
 int start_proc(Proc *, void (*entry)(u64), u64 arg);
 NO_RETURN void exit(int code);
-int wait(int *exitcode);
-int kill(int pid);
+WARN_RESULT int wait(int *exitcode);
+WARN_RESULT int kill(int pid);

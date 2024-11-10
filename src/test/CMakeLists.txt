@@ -11,6 +11,7 @@ set(test_util_src
     range.c
     sync.c
     user_proc_test.c
+    io_test.c
 )
 add_library(test_util STATIC ${test_util_src})
 # make test a fake lib which does not run any test in reality.
@@ -26,12 +27,16 @@ set(lab1cases "palloc;malloc;alloc2023;lab1;little;steal")
 set(lab2cases "alloc2023;pcreat;pwait;pwtmany;prpr;prpr2;prpr3;prpr4;pstree;pstree2;trap;rcc")
 # Lab 3: User proc
 set(lab3cases "alloc2023;trap")
+# Lab 4: Virtio
+set(lab4cases "alloc2023;trap")
+# Lab 5: Log FS, but will test previous cases
+set(lab5cases "alloc2023;trap;proc;user")
 
 # enabled test cases
 # (warning: too many test cases result in too many images)
 # TO ENABLE ALL TESTS: 
 # set(tcases "${lab0cases};${lab1cases};...;${labncases}" CACHE STRING "")
-set(tcases "${lab3cases}" CACHE STRING "")
+set(tcases "${lab5cases}" CACHE STRING "")
 
 # add all of your test cases here.
 # and build a library for it.

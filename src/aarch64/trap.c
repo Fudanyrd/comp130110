@@ -25,6 +25,33 @@ static inline int trap_from_user(UserContext *context)
     return (context->spsr & 0b1111) == 0;
 }
 
+/** Print the calling stack of an saved context */
+static void trap_bt(UserContext *ctx)
+{
+    if (trap_from_user(ctx)) {
+        // this does not work for user context,
+        // since user stack may already be destroyed,
+        // and may cause kernel to trigger page fault.
+        printk("Trap from user space");
+        return;
+    }
+    // print the address that the intr occurred
+    printk("%p ", (void *)ctx->elr);
+
+    // frame pointer
+    void *fptr = (void *)ctx->fp;
+    void *pc; // program counter
+    while (fptr != NULL) {
+        pc = *(void **)(fptr + 0x8);
+        if (pc != NULL) {
+            pc = pc - 0x4;
+        }
+        printk("%p ", pc);
+        fptr = *(void **)fptr;
+    }
+    printk("\n");
+}
+
 void trap_global_handler(UserContext *context)
 {
     thisproc()->ucontext = context;
@@ -54,6 +81,7 @@ void trap_global_handler(UserContext *context)
     case ESR_EC_DABORT_EL0:
     case ESR_EC_DABORT_EL1: {
         printk("Page fault\n");
+        trap_bt(context);
         PANIC();
     } break;
     default: {
