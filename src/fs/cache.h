@@ -4,134 +4,111 @@
 #include <fs/block_device.h>
 #include <fs/defines.h>
 
-/**
-    @brief maximum number of distinct blocks that one atomic operation can hold.
+/** 
+ * maximum number of distinct blocks that one atomic operation can hold.
  */
 #define OP_MAX_NUM_BLOCKS 10
 
 /**
-    @brief the threshold of block cache to start eviction.
-
-    if the number of cached blocks is no less than this threshold, we can
-    evict some blocks in `acquire` to keep block cache small.
+ * the threshold of block cache to start eviction.
+ *
+ *  if the number of cached blocks is no less than this threshold, we can
+ *  evict some blocks in `acquire` to keep block cache small.
  */
 #define EVICTION_THRESHOLD 20
 
 /**
-    @brief a block in block cache.
-
-    @note you can add any member to this struct as you want.
+ * a block in block cache.
+ * note you can add any member to this struct as you want.
  */
 typedef struct {
-    /**
-        @brief the corresponding block number on disk.
-
-        @note should be protected by the global lock of the block cache.
-
-        @note required by our test. Do NOT remove it.
+    /** the corresponding block number on disk.
+     *  note: should be protected by the global lock of the block cache.
+     *  note: required by our test. Do NOT remove it.
      */
     usize block_no;
 
-    /**
-        @brief list this block into a linked list.
+    /** Timestamp of nearest access */
+    usize timestamp;
 
-        @note should be protected by the global lock of the block cache.
+    /** the block's pin count. A pinned block should not be evicted 
+     * from the cache. e.g. it is dirty.
+     *
+     *  note: should be protected by the global lock of the block cache.
      */
-    ListNode node;
+    u32 pinned;
 
-    /**
-        @brief is the block already acquired by some thread or process?
+    /** the sleep lock protecting `valid` and `data`. */
+    SleepLock lock;
 
-        @note should be protected by the global lock of the block cache.
+    /** is the block already acquired by some thread or process?
+     *  note: should be protected by the global lock of the block cache.
      */
     bool acquired;
 
-    /**
-        @brief is the block pinned?
-
-        A pinned block should not be evicted from the cache.
-
-        e.g. it is dirty.
-
-        @note should be protected by the global lock of the block cache.
-     */
-    bool pinned;
-
-    /**
-        @brief the sleep lock protecting `valid` and `data`.
-     */
-    SleepLock lock;
-
-    /**
-        @brief is the content of block loaded from disk?
-
-        You may find it useless and it *is*. It is just a test flag read
-        by our test. In your code, you should:
-
-        * set `valid` to `false` when you allocate a new `Block` struct.
-        * set `valid` to `true` only after you load the content of block from
-       disk.
-
-        @note required by our test. Do NOT remove it.
+    /** is the content of block loaded from disk?
+     * 
+     *  You may find it useless and it *is*. It is just a test flag read
+     *  by our test. In your code, you should:
+     * 
+     *  + set `valid` to `false` when you allocate a new `Block` struct.
+     *  + set `valid` to `true` only after you load the content of block from
+     * disk.
+     * 
+     *  note: required by our test. Do NOT remove it.
      */
     bool valid;
-    /**
-        @brief the real in-memory content of the block on disk.
-     */
+
+    /** the real in-memory content of the block on disk. */
     u8 data[BLOCK_SIZE];
 } Block;
 
-/**
-    @brief an atomic operation context.
-
-    @note add any member to this struct as you want.
-
-    @see begin_op, end_op
+/** an atomic operation context.
+ *  note: add any member to this struct as you want.
+ *  see: begin_op, end_op
  */
 typedef struct {
-    /**
-        @brief how many operation remains in this atomic operation?
-
-        If `rm` is 0, any **new** `sync` will panic.
+    /** how many operation remains in this atomic operation?
+     *  If `rm` is 0, any **new** `sync` will panic.
      */
     usize rm;
-    /**
-        @brief a timestamp (i.e. an ID) to identify this atomic operation.
 
-        @note your implementation does NOT have to use this field, just ignoring
-       it is OK too.
+    /** Lock that protects its member */
+    SpinLock lock;
 
-        @note only required by our test. Do NOT remove it.
+    /** Total number of blocks write */
+    usize num_blocks;
+    Block *bwrite[OP_MAX_NUM_BLOCKS];
+
+    /** a timestamp (i.e. an ID) to identify this atomic operation.
+     * 
+     * note: your implementation does NOT have to use this field, just ignoring
+     * it is OK too.
+     * 
+     * note: only required by our test. Do NOT remove it.
      */
     usize ts;
 } OpContext;
 
 typedef struct {
-    /**
-        @return the number of cached blocks at this moment.
-
-        @note only required by our test to print statistics.
+    /** the number of cached blocks at this moment.
+     * note: only required by our test to print statistics.
      */
     usize (*get_num_cached_blocks)();
 
-    /**
-        @brief declare a block as acquired by the caller.
-
-        It reads the content of block at `block_no` from disk, and locks the
-       block so that the caller can exclusively modify it.
-
-        @return the pointer to the locked block.
-
-        @see `release` - the counterpart of this function.
+    /** declare a block as acquired by the caller.
+     * It reads the content of block at `block_no` from disk, and locks the
+     * block so that the caller can exclusively modify it.
+     * 
+     *  @return the pointer to the locked block.
+     *  @see `release` - the counterpart of this function.
      */
     Block *(*acquire)(usize block_no);
 
     /**
-        @brief declare an acquired block as released by the caller.
-
-        It unlocks the block so that other threads can acquire it again.
-
-        @note it does not need to write the block content back to disk.
+     * @brief declare an acquired block as released by the caller.
+     * It unlocks the block so that other threads can acquire it again.
+     * @note it does not need to write the block content back to disk.
      */
     void (*release)(Block *block);
 
@@ -147,17 +124,13 @@ typedef struct {
     // checkpointed.
 
     /**
-        @brief begin a new atomic operation and initialize `ctx`.
-
-        If there are too many running operations (i.e. our logging is
-        too small to hold all of them), `begin_op` should sleep until
-        we can start a new operation.
-
-        @param[out] ctx the context to be initialized.
-
-        @throw panic if `ctx` is NULL.
-
-        @see `end_op` - the counterpart of this function.
+     * @brief begin a new atomic operation and initialize `ctx`.
+     * If there are too many running operations (i.e. our logging is
+     * too small to hold all of them), `begin_op` should sleep until
+     * we can start a new operation.
+     * @param[out] ctx the context to be initialized.
+     * @throw panic if `ctx` is NULL.
+     * @see `end_op` - the counterpart of this function.
      */
     void (*begin_op)(OpContext *ctx);
 
@@ -198,22 +171,17 @@ typedef struct {
     // in bitmap. therefore when we allocate a new block, it usually returns a
     // data block. however, nobody can prevent you freeing a non-data block :)
 
-    /**
-        @brief allocate a new zero-initialized block.
-
-        It searches bitmap for a free block, mark it allocated and
-        returns the block number.
-
-        @param ctx since this function may write on-disk bitmap, it must be
-                   associated with an atomic operation.
-                   The caller must ensure that `ctx` is **running**.
-
-        @return the block number of the allocated block.
-
-        @note you should use `acquire`, `sync` and `release` to do disk I/O
-                here.
-
-        @throw panic if there is no free block on disk.
+    /** allocate a new zero-initialized block.
+     *  It searches bitmap for a free block, mark it allocated and
+     *  returns the block number.
+     * 
+     *  @param ctx since this function may write on-disk bitmap, it must be
+     *             associated with an atomic operation.
+     *             The caller must ensure that `ctx` is **running**.
+     *  @return the block number of the allocated block.
+     *  @note you should use `acquire`, `sync` and `release` to do disk I/O
+     *        here.
+     *  @throw panic if there is no free block on disk.
      */
     usize (*alloc)(OpContext *ctx);
 

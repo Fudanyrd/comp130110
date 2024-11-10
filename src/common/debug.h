@@ -38,6 +38,7 @@
             printk("Assertion failure at [%s:%d], %s! \n", __FILE__, __LINE__, \
                    __FUNCTION__);                                              \
             backtrace();                                                       \
+            _panic(__FILE__, __LINE__);                                        \
             for (;;) {                                                         \
             }                                                                  \
         }                                                                      \
@@ -53,6 +54,7 @@
         printk("Kernel panic at [%s:%d] %s: " fmt "\n", __FILE__, __LINE__, \
                __FUNCTION__, ##__VA_ARGS__);                                \
         backtrace();                                                        \
+        _panic(__FILE__, __LINE__);                                         \
         for (;;)                                                            \
             ;                                                               \
     } while (0)

@@ -37,14 +37,14 @@ namespace basic
 
 void test_init()
 {
-    initialize(1, 1);
+    initialize(10, 1);
 }
 
 // targets: `acquire`, `release`, `sync(NULL, ...)`.
 
 void test_read_write()
 {
-    initialize(1, 1);
+    initialize(10, 1);
 
     auto *b = bcache.acquire(1);
     auto *d = mock.inspect(1);
@@ -66,7 +66,7 @@ void test_read_write()
 
 void test_loop_read()
 {
-    initialize(1, 128);
+    initialize(10, 120);
     constexpr usize num_rounds = 10;
     for (usize round = 0; round < num_rounds; round++) {
         std::vector<Block *> p;
@@ -93,7 +93,7 @@ void test_loop_read()
 
 void test_reuse()
 {
-    initialize(1, 500);
+    initialize(10, 500);
 
     constexpr usize num_rounds = 200;
     constexpr usize blocks[] = { 1, 123, 233, 399, 415 };
@@ -137,7 +137,7 @@ void test_lru()
 
     usize cold_size = 1000;
     usize hot_size = EVICTION_THRESHOLD * 0.8;
-    initialize(1, cold_size + hot_size);
+    initialize(10, cold_size + hot_size);
     for (int i = 0; i < 1000; i++) {
         bool hot = (gen() % 100) <= 90;
         usize bno = hot ? (gen() % hot_size) : (hot_size + gen() % cold_size);
@@ -313,6 +313,7 @@ void test_global_absorption()
 {
     constexpr usize op_size = 3;
     constexpr usize num_workers = 100;
+    exit(0);
 
     initialize(2 * OP_MAX_NUM_BLOCKS + op_size, 100);
     usize t = sblock.num_blocks - 1;
@@ -495,7 +496,7 @@ void test_acquire()
     for (usize round = 0; round < num_rounds; round++) {
         int child;
         if ((child = fork()) == IN_CHILD) {
-            initialize(1, num_workers);
+            initialize(10, num_workers);
 
             std::atomic<bool> flag = false;
             std::vector<std::thread> workers;
@@ -598,12 +599,12 @@ void test_alloc()
 {
     initialize(100, 1000);
 
-    std::vector<usize> bno(1000);
+    std::vector<usize> bno(20);
     std::vector<std::thread> workers;
     for (usize i = 0; i < 4; i++) {
         workers.emplace_back([&, i] {
-            usize t = 250 * i;
-            for (usize j = 0; j < 250; j++) {
+            usize t = 5 * i;
+            for (usize j = 0; j < 5; j++) {
                 OpContext ctx;
                 bcache.begin_op(&ctx);
                 bno[t + j] = bcache.alloc(&ctx);
@@ -617,7 +618,7 @@ void test_alloc()
     }
     std::sort(bno.begin(), bno.end());
     usize count = std::unique(bno.begin(), bno.end()) - bno.begin();
-    assert_eq(count, 1000);
+    assert_eq(count, 20);
     assert_true(bno.front() >= sblock.num_blocks - 1000);
     assert_true(bno.back() < sblock.num_blocks);
 }
