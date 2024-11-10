@@ -353,6 +353,7 @@ static void init_block(Block *block)
 
     init_sleeplock(&block->lock);
     block->valid = false;
+    block->timestamp = 0;
     memset(block->data, 0, sizeof(block->data));
 }
 
@@ -385,7 +386,7 @@ static Block *cache_acquire(usize block_no)
      * + else select the unused block with least timestamp;
      */
     for (int i = 0; i < nblock; i++) {
-        if (blocks[i].block_no == block_no && blocks[i].valid) {
+        if (blocks[i].block_no == block_no) {
             ret = &blocks[i];
             break;
         }
@@ -395,12 +396,9 @@ static Block *cache_acquire(usize block_no)
             continue;
         }
 
-        if (!blocks[i].valid) {
-            ret = &blocks[i];
-            ret->timestamp = 0;
-            ret->block_no = 0;
-        }
-
+        // reuse the slot with least timestamp
+        // these with timestamp = 0 is not initialized,
+        // hence will be selected first.
         if (ret == NULL || ret->timestamp > blocks[i].timestamp) {
             // lru replacement
             ret = &blocks[i];
@@ -417,6 +415,7 @@ static Block *cache_acquire(usize block_no)
     if (ret != NULL && ret->block_no != block_no) {
         ret->block_no = block_no;
         ret->valid = false;
+        ASSERT(ret->pinned == 0);
     }
 
     if (ret != NULL) {
