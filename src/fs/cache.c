@@ -34,7 +34,6 @@ static void cond_wait(struct condvar *cv, SpinLock *lock)
     // release holding lock, and goto sleep
     release_spinlock(lock);
     unalertable_wait_sem(&cv->sema);
-    _unlock_sem(&cv->sema);
     // reacquire lock
     acquire_spinlock(lock);
 }
