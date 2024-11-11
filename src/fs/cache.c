@@ -15,52 +15,7 @@
  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
 // clang-format on
 
-struct condvar {
-    u32 waitcnt; // number of waiting threads
-    Semaphore sema;
-};
-
-static inline void cond_init(struct condvar *cv)
-{
-    init_sem(&cv->sema, 0);
-    cv->waitcnt = 0;
-}
-
-static void cond_wait(struct condvar *cv, SpinLock *lock)
-{
-    _lock_sem(&cv->sema);
-    // incr # waiting
-    cv->waitcnt++;
-    // release holding lock, and goto sleep
-    release_spinlock(lock);
-    unalertable_wait_sem(&cv->sema);
-    // reacquire lock
-    acquire_spinlock(lock);
-}
-
-// wake up only one sleeping thread(if any)
-static void cond_signal(struct condvar *cv)
-{
-    _lock_sem(&cv->sema);
-    if (cv->waitcnt == 0) {
-        _unlock_sem(&cv->sema);
-        return;
-    }
-    cv->waitcnt--;
-    _post_sem(&cv->sema);
-    _unlock_sem(&cv->sema);
-}
-
-// wake up all sleeping thread
-static void cond_broadcast(struct condvar *cv)
-{
-    _lock_sem(&cv->sema);
-    for (u32 i = 0; i < cv->waitcnt; i++) {
-        _post_sem(&cv->sema);
-    }
-    cv->waitcnt = 0;
-    _unlock_sem(&cv->sema);
-}
+#include "condvar.h"
 
 // clang-format off
 /*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -303,7 +258,7 @@ static void logger_write(Block *b)
 }
 
 // xv6 style end_op
-static void logger_end()
+static void logger_end(OpContext *ctx __attribute__((unused)))
 {
     int do_commit = 0;
 
@@ -540,7 +495,7 @@ static void cache_sync(OpContext *ctx, Block *block)
 static void cache_end_op(OpContext *ctx)
 {
     // TODO
-    logger_end();
+    logger_end(ctx);
     ctx->num_blocks = 0;
 }
 
