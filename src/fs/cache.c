@@ -5,6 +5,7 @@
 #include <kernel/printk.h>
 #include <kernel/proc.h>
 #include <common/sem.h>
+#include <common/string.h>
 
 #undef acquire_sleeplock
 #define acquire_sleeplock unalertable_acquire_sleeplock
@@ -107,6 +108,54 @@ static INLINE void device_write(Block *block)
     device->write(block->block_no, block->data);
 }
 
+// clang-format off
+/*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *                       LOGGER CACHE TAYLORED 
+ +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
+// clang-format on
+
+/** Cache for log area blocks 
+ * 
+ * Typical Usage:
+ * // acquire the log cache
+ * struct logcache *lc = lc_acquire(idx);
+ * // modify logcache...
+ * // persist log cache:
+ * lcache_write(idx);
+ * // release the cache:
+ * lc_release(lc); lc = NULL;
+ */
+struct logcache {
+    // Must acquire lock
+    u8 data[BLOCK_SIZE];
+    SleepLock lock;
+};
+
+/** All log blocks reside in memory */
+static struct logcache lcache[LOG_MAX_SIZE];
+
+/** Returns locked pointer to the idx(start from 0) log cache */
+static inline struct logcache *lcache_acquire(int idx)
+{
+    ASSERT((size_t)idx <= header.num_blocks && (size_t)idx <= LOG_MAX_SIZE);
+    struct logcache *ret = &lcache[idx];
+    acquire_sleeplock(&ret->lock);
+    return ret;
+}
+
+/** Persist the content of a log to log area */
+static inline void lcache_write(int idx)
+{
+    device->write(log.start + 1 + idx, lcache[idx].data);
+}
+
+/** Release a log cache acquired before.  */
+static inline void lcache_release(struct logcache *lc)
+{
+    release_sleeplock(&lc->lock);
+    return;
+}
+
 // read log header from disk.
 static INLINE void read_header()
 {
@@ -152,20 +201,32 @@ static void install_trans(bool recovering)
     if (recovering) {
         // read, write directly from disk.
         // since cache is empty
-        static u8 buf[BLOCK_SIZE];
+
+        // borrow a buffer from log cache
+        struct logcache *lc = lcache_acquire(0);
+        u8 *buf = (u8 *)lc->data;
         for (usize i = 0; i < header.num_blocks; i++) {
             device->read(i + log.start + 1, buf);
             device->write(header.block_no[i], buf);
         }
+        lcache_release(lc);
     } else {
         Block *src;
+        struct logcache *lc;
         // the data is (probably) still in the buffer
         // this will avoid one read of log area
         for (usize i = 0; i < header.num_blocks; i++) {
+            // a read to log cache, so the lock need to be held
+            lc = lcache_acquire(i); // log block, then data
             src = cache_acquire(header.block_no[i]);
+            memmove(src->data, lc->data, BLOCK_SIZE);
+
+            // write to data area
             device->write(src->block_no, src->data);
+
             // it is pinned previously in logger_write()
             cache_unpin(src);
+            lcache_release(lc);
             cache_release(src);
         }
     }
@@ -179,11 +240,19 @@ static void install_trans(bool recovering)
 static void logger_write_log()
 {
     Block *dirty;
+    struct logcache *lc;
     ASSERT(header.num_blocks <= log.size);
     for (usize i = 0; i < header.num_blocks; i++) {
         // acquire() does not return NULL
+        lc = lcache_acquire(i);
         dirty = cache_acquire(header.block_no[i]);
-        device->write(log.start + 1 + i, dirty->data);
+
+        // write to log cache, then persist.
+        // equiv: device->write(log.start + 1 + i, dirty->data);
+        memmove(lc->data, dirty->data, BLOCK_SIZE);
+        lcache_write(i);
+
+        lcache_release(lc);
         cache_release(dirty);
     }
 }
@@ -426,6 +495,11 @@ void init_bcache(const SuperBlock *_sblock, const BlockDevice *_device)
     init_spinlock(&cache_lock);
     cache_avail = EVICTION_THRESHOLD;
     nblock = EVICTION_THRESHOLD;
+
+    // initialize logger cache
+    for (size_t i = 0; i < LOG_MAX_SIZE; i++) {
+        init_sleeplock(&lcache[i].lock);
+    }
 
     // read header and initialize logger
     read_header();
