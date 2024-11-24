@@ -19,10 +19,9 @@
  */
 typedef struct {
     /**
-        @brief the lock protecting the inode metadata and its content.
-
-        @note it does NOT protect `rc`, `node`, `valid`, etc, because they are
-        "runtime" variables, not "filesystem" metadata or data of the inode.
+     *  @brief the lock protecting the inode metadata and its content.
+     *  @note it does NOT protect `rc`, `node`, `valid`, etc, because they are
+     *  "runtime" variables, not "filesystem" metadata or data of the inode.
      */
     SleepLock lock;
 
