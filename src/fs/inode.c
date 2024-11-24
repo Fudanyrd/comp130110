@@ -434,10 +434,66 @@ static usize inode_map(OpContext* ctx,
                        usize offset,
                        bool* modified) {
     // TODO
+    if (offset >= INODE_MAX_BYTES) {
+        PANIC();
+    }
+    *modified = false;
+
+    // inode must be valid. or we're reading
+    // dirty data.
+    ASSERT(inode->valid);
+
+    if (offset < INODE_NUM_DIRECT * BLOCK_SIZE) {
+        // search from direct block
+        usize idx;
+        idx = inode->entry.addrs[offset / BLOCK_SIZE];
+        if (idx == 0) {
+            if (ctx == NULL) {
+                goto bad_ctx;
+            }
+            *modified = true;
+            idx = inode->entry.addrs[offset / BLOCK_SIZE] = cache->alloc(ctx);
+        }
+        return idx;
+    }
+
+    // search from indirect block.
+    offset -= INODE_NUM_DIRECT * BLOCK_SIZE;
+    usize ret = 0;
+    if (inode->entry.indirect == 0) {
+        if (ctx == NULL) {
+            goto bad_ctx;
+        }
+        // allocate for indirect block
+        *modified = true;
+        inode->entry.indirect = cache->alloc(ctx);
+    }
+    Block *indir_blk = cache->acquire(inode->entry.indirect);
+    u32 *indir_arr = (u32 *)indir_blk->data;
+    if (indir_arr[offset / BLOCK_SIZE] == 0) {
+        if (ctx == NULL) {
+            goto bad_ctx;
+        }
+        // allocate an data block
+        ret = cache->alloc(ctx);
+        indir_arr[offset / BLOCK_SIZE] = ret;
+
+        // there's write, so must sync.
+        cache->sync(ctx, indir_blk);
+    }
+    cache->release(indir_blk);
+    return ret;
+
+bad_ctx:
     return 0;
 }
 
 // see `inode.h`.
+/**
+    @brief read `count` bytes from `inode`, beginning at `offset`, to `dest`.
+    @return how many bytes you actually read.
+    @note caller must hold the lock of `inode`.
+ */
 static usize inode_read(Inode* inode, u8* dest, usize offset, usize count) {
     InodeEntry* entry = &inode->entry;
     if (count + offset > entry->num_bytes)
@@ -447,11 +503,77 @@ static usize inode_read(Inode* inode, u8* dest, usize offset, usize count) {
     ASSERT(end <= entry->num_bytes);
     ASSERT(offset <= end);
 
+    bool modified;
+
+    // what we do here:
+    // 1. fill offset to a multiple of BLOCK_SIZE;
+    // 2. fill consecutive blocks;
+    // 3. fill the rest(if any).
+
+    // number of bytes to read in the next op
+    usize nread = BLOCK_SIZE - offset % BLOCK_SIZE;
+    //  nread <- min(count, nread)
+    nread = nread > count ? count : nread;
+    if (nread > 0) {
+        usize idx = inode_map(NULL, inode, offset, &modified);
+        ASSERT(!modified);
+
+        if (idx == 0) {
+            memset(dest, 0x0, nread);
+        } else {
+            Block *blk_dat= cache->acquire(idx);
+            memcpy(dest, 
+                  (u8 *)blk_dat->data + offset % BLOCK_SIZE, nread);
+            cache->release(blk_dat);
+        }
+
+        // advance
+        offset += nread;
+        dest += nread;
+        count -= nread;
+    }
+
+    while (count >= BLOCK_SIZE) {
+        // read operation do NOT write any block,
+        // so a context is not needed.
+        usize idx = inode_map(NULL, inode, offset, &modified);
+        ASSERT(!modified);
+
+        if (idx == 0) {
+            // fake that we 'allocated' a zero-block.
+            memset(dest, 0x0, BLOCK_SIZE);
+        } else {
+            Block *blk_dat= cache->acquire(idx);
+            memcpy(dest, blk_dat->data, BLOCK_SIZE);
+            cache->release(blk_dat);
+        }
+
+        // advance
+        count -= BLOCK_SIZE;
+        dest += BLOCK_SIZE;
+        offset += BLOCK_SIZE;
+        nread += BLOCK_SIZE;
+    }
+
+    if (count) {
+        nread += count;
+        usize idx = inode_map(NULL, inode, offset, &modified);
+        Block *blk_dat = cache->acquire(idx);
+        memcpy(dest, blk_dat->data, count);
+        cache->release(blk_dat);
+        // no need to advance.
+    }
+
     // TODO
-    return 0;
+    return nread;
 }
 
 // see `inode.h`.
+/**
+    @brief write `count` bytes from `src` to `inode`, beginning at `offset`.
+    @return how many bytes you actually write.
+    @note caller must hold the lock of `inode`.
+ */
 static usize inode_write(OpContext* ctx,
                          Inode* inode,
                          u8* src,
@@ -463,8 +585,68 @@ static usize inode_write(OpContext* ctx,
     ASSERT(end <= INODE_MAX_BYTES);
     ASSERT(offset <= end);
 
+    // a dirty inode continue to be dirty on write.
+    bool dirty = false;
+    bool modified;
+    usize nwrite = BLOCK_SIZE - offset % BLOCK_SIZE;
+    // nwrite <- min(nwrite, count)
+    nwrite = nwrite > count ? count : nwrite;
+
+    // pad to 512
+    if (nwrite > 0) {
+        usize idx = inode_map(ctx, inode, offset, &dirty);
+        Block *blk_dat = cache->acquire(idx);
+        memcpy((u8 *)blk_dat->data + offset % BLOCK_SIZE, src, nwrite);
+        cache->sync(ctx, blk_dat);
+        cache->release(blk_dat);
+
+        // advance
+        count -= nwrite;
+        offset += nwrite;
+        src += nwrite;
+    }
+
+    // read in blocks
+    while (count >= BLOCK_SIZE) {
+        usize idx = inode_map(ctx, inode, offset, &modified);
+        Block *blk_dat = cache->acquire(idx);
+        memcpy((u8 *)blk_dat->data, src, BLOCK_SIZE);
+        cache->sync(ctx, blk_dat);
+        cache->release(blk_dat);
+
+        // advance
+        if (modified) {
+            dirty = true;
+        }
+        count -= BLOCK_SIZE;
+        offset += BLOCK_SIZE;
+        src += BLOCK_SIZE;
+        nwrite += BLOCK_SIZE;
+    }
+
+    // finally
+    if (count) {
+        nwrite += count;
+        usize idx = inode_map(ctx, inode, offset, &modified);
+        Block *blk_dat = cache->acquire(idx);
+        memcpy((u8 *)blk_dat->data, src, count);
+        cache->sync(ctx, blk_dat);
+        cache->release(blk_dat);
+    }
+
+    // reset file offset
+    if (offset > entry->num_bytes) {
+        offset = entry->num_bytes;
+        dirty = true;
+    }
+
+    // now, if the inode is written, sync.
+    if (dirty) {
+        inode_sync(ctx, inode, true);
+    }
+
     // TODO
-    return 0;
+    return nwrite;
 }
 
 // see `inode.h`.
