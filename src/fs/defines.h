@@ -17,6 +17,8 @@
 #define INODE_MAX_BLOCKS (INODE_NUM_DIRECT + INODE_NUM_INDIRECT)
 #define INODE_MAX_BYTES (INODE_MAX_BLOCKS * BLOCK_SIZE)
 
+#define DIRENTR_PER_BLOCK (BLOCK_SIZE / sizeof(DirEntry))
+
 // the maximum length of file names, including trailing '\0'.
 #define FILE_NAME_MAX_LENGTH 14
 
