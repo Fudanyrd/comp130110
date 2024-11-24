@@ -56,7 +56,7 @@ typedef struct {
     /**
         @brief the real in-memory copy of the inode on disk.
      */
-    InodeEntry entry; 
+    InodeEntry entry;
 } Inode;
 
 /**
@@ -68,7 +68,7 @@ typedef struct {
 
         @see `init_inodes` should initialize it to a valid inode.
      */
-    Inode* root;
+    Inode *root;
 
     /**
         @brief allocate a new zero-initialized inode on disk.
@@ -79,7 +79,7 @@ typedef struct {
 
         @throw panic if allocation fails (e.g. no more free inode).
      */
-    usize (*alloc)(OpContext* ctx, InodeType type);
+    usize (*alloc)(OpContext *ctx, InodeType type);
 
     /**
         @brief acquire the sleep lock of `inode`.
@@ -91,14 +91,14 @@ typedef struct {
 
         @see `unlock` - the counterpart of this method.
      */
-    void (*lock)(Inode* inode);
+    void (*lock)(Inode *inode);
 
     /**
         @brief release the sleep lock of `inode`.
         
         @see `lock` - the counterpart of this method.
      */
-    void (*unlock)(Inode* inode);
+    void (*unlock)(Inode *inode);
 
     /**
         @brief synchronize the content of `inode` between memory and disk.
@@ -118,7 +118,7 @@ typedef struct {
 
         @throw panic if `do_write` is true and `inode` is invalid.
      */
-    void (*sync)(OpContext* ctx, Inode* inode, bool do_write);
+    void (*sync)(OpContext *ctx, Inode *inode, bool do_write);
 
     /**
         @brief get an inode by its inode number.
@@ -133,7 +133,7 @@ typedef struct {
 
         @see `put` - the counterpart of this method.
      */
-    Inode* (*get)(usize inode_no);
+    Inode *(*get)(usize inode_no);
 
     /**
         @brief truncate all contents of `inode`.
@@ -144,7 +144,7 @@ typedef struct {
 
         @note caller must hold the lock of `inode`.
      */
-    void (*clear)(OpContext* ctx, Inode* inode);
+    void (*clear)(OpContext *ctx, Inode *inode);
 
     /**
         @brief duplicate an inode.
@@ -155,7 +155,7 @@ typedef struct {
 
         @return the duplicated inode (i.e. may just return `inode`).
      */
-    Inode* (*share)(Inode* inode);
+    Inode *(*share)(Inode *inode);
 
     /**
         @brief notify that you no longer need `inode`.
@@ -175,7 +175,7 @@ typedef struct {
 
         @see `clear` can be used to free all file blocks of `inode`.
      */
-    void (*put)(OpContext* ctx, Inode* inode);
+    void (*put)(OpContext *ctx, Inode *inode);
 
     /**
         @brief read `count` bytes from `inode`, beginning at `offset`, to `dest`.
@@ -184,7 +184,7 @@ typedef struct {
 
         @note caller must hold the lock of `inode`.
      */
-    usize (*read)(Inode* inode, u8* dest, usize offset, usize count);
+    usize (*read)(Inode *inode, u8 *dest, usize offset, usize count);
 
     /**
         @brief write `count` bytes from `src` to `inode`, beginning at `offset`.
@@ -193,10 +193,7 @@ typedef struct {
 
         @note caller must hold the lock of `inode`.
      */
-    usize (*write)(OpContext* ctx,
-                   Inode* inode,
-                   u8* src,
-                   usize offset,
+    usize (*write)(OpContext *ctx, Inode *inode, u8 *src, usize offset,
                    usize count);
 
     /**
@@ -210,7 +207,7 @@ typedef struct {
 
         @throw panic if `inode` is not a directory.
      */
-    usize (*lookup)(Inode* inode, const char* name, usize* index);
+    usize (*lookup)(Inode *inode, const char *name, usize *index);
 
     /**
         @brief insert a new directory entry in directory `inode`.
@@ -229,9 +226,7 @@ typedef struct {
 
         @throw panic if `inode` is not a directory.
      */
-    usize (*insert)(OpContext* ctx,
-                    Inode* inode,
-                    const char* name,
+    usize (*insert)(OpContext *ctx, Inode *inode, const char *name,
                     usize inode_no);
 
     /**
@@ -246,7 +241,7 @@ typedef struct {
 
         @throw panic if `inode` is not a directory.
      */
-    void (*remove)(OpContext* ctx, Inode* inode, usize index);
+    void (*remove)(OpContext *ctx, Inode *inode, usize index);
 } InodeTree;
 
 /**
@@ -262,4 +257,4 @@ extern InodeTree inodes;
     @param sblock the loaded super block.
     @param cache the initialized block cache.
  */
-void init_inodes(const SuperBlock* sblock, const BlockCache* cache);
+void init_inodes(const SuperBlock *sblock, const BlockCache *cache);
