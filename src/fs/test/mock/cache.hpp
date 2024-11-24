@@ -318,11 +318,15 @@ struct MockBlockCache {
             load(mblk[i], sblk[i]);
         }
 
+        mblk[i].block.valid = true;
+        mblk[i].block.pinned++;
         return &mblk[i].block;
     }
 
     void release(Block *b) {
         auto *p = check_and_get_cell(b);
+        assert_true(b->pinned > 0);
+        b->pinned--;
         p->mutex.unlock();
     }
 

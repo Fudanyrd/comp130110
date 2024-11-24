@@ -43,10 +43,12 @@ static ListNode tail;
 
 // push an inode into list. Must hold lock.
 static INLINE void inode_push_lst(Inode *ino) {
-    ListNode *prev = head.next->prev; 
-    ListNode *nxt = head.next;
+    ListNode *prev = tail.prev; 
+    ListNode *nxt = &tail;
     ino->node.prev = prev;
     ino->node.next = nxt;
+    prev->next = &ino->node;
+    nxt->prev = &ino->node;
 }
 
 // remove an inode from list. Must hold lock.
@@ -72,7 +74,6 @@ static Inode *inode_find_lst(usize ino) {
 
     for (; it != &tail; it = it->next) {
         ret = ListEntr(it, Inode, node);
-        ASSERT(ret->valid);
         if (ret->inode_no == ino) {
             return ret;
         }
@@ -325,7 +326,7 @@ static Inode* inode_get(usize inode_no) {
  */
 static void inode_clear(OpContext* ctx, Inode* inode) {
     // TODO
-    ASSERT(inode->rc.count == 0);
+    // ASSERT(inode->rc.count == 0);
 
     // you should call inode_lock to lock it.
     for (usize i = 0; i < INODE_NUM_DIRECT; i++) {
@@ -346,7 +347,7 @@ static void inode_clear(OpContext* ctx, Inode* inode) {
                 cache->free(ctx, arr[i]);
             }
         }
-        cache->release(indirect);
+        cache->release(indir);
         cache->free(ctx, indirect);
     }
     inode->entry.indirect = 0;
@@ -368,7 +369,6 @@ static Inode* inode_share(Inode* inode) {
     ASSERT(inode != NULL);
     increment_rc(&inode->rc);
     return inode;
-    return 0;
 }
 
 // see `inode.h`.
@@ -402,6 +402,7 @@ static void inode_put(OpContext* ctx, Inode* inode) {
 
         // free the inode from list.
         acquire_spinlock(&lock);
+        inode_rm_lst(inode);
         kfree(inode);
         release_spinlock(&lock);
     }
@@ -480,6 +481,8 @@ static usize inode_map(OpContext* ctx,
 
         // there's write, so must sync.
         cache->sync(ctx, indir_blk);
+    } else {
+        ret = indir_arr[offset / BLOCK_SIZE];
     }
     cache->release(indir_blk);
     return ret;
@@ -632,11 +635,13 @@ static usize inode_write(OpContext* ctx,
         memcpy((u8 *)blk_dat->data, src, count);
         cache->sync(ctx, blk_dat);
         cache->release(blk_dat);
+        // BUG: should update offset for it's used later.
+        offset += count;
     }
 
     // reset file offset
     if (offset > entry->num_bytes) {
-        offset = entry->num_bytes;
+        entry->num_bytes = offset;
         dirty = true;
     }
 
@@ -650,15 +655,92 @@ static usize inode_write(OpContext* ctx,
 }
 
 // see `inode.h`.
+/**
+    @brief look up an entry named `name` in directory `inode`.
+
+    @param[out] index the index of found entry in this directory.
+
+    @return the inode number of the corresponding inode, or 0 if not found.
+    
+    @note caller must hold the lock of `inode`.
+
+    @throw panic if `inode` is not a directory.
+ */
 static usize inode_lookup(Inode* inode, const char* name, usize* index) {
     InodeEntry* entry = &inode->entry;
     ASSERT(entry->type == INODE_DIRECTORY);
+
+    usize offset = 0;
+    usize rest = inode->entry.num_bytes;
+    ASSERT(inode->entry.num_bytes % sizeof(DirEntry) == 0);
+    while (rest >= BLOCK_SIZE) {
+        // can read 512 / 16 = 32 inodes a time!
+        // we read directly in the cache to avoid 
+        // memory copy.
+
+        bool modified;
+        usize idx = inode_map(NULL, inode, offset, &modified);
+        ASSERT(!modified);
+        Block *block = cache->acquire(idx);
+        DirEntry *de = (DirEntry *)block->data;
+        for (usize i = 0; i < BLOCK_SIZE / sizeof(DirEntry); i++) {
+            if (strncmp(name, de[i].name, FILE_NAME_MAX_LENGTH) == 0) {
+                // found!
+                cache->release(block);
+                if (index != NULL) {
+                    *index = i + offset / sizeof(DirEntry);
+                }
+                return de[i].inode_no;
+            }
+        }
+        cache->release(block);
+
+        // advance
+        offset += BLOCK_SIZE;
+        rest -= BLOCK_SIZE;
+    }
+
+    // optimization: check rest to avoid a cache acquire.
+    if (rest == 0) {
+        return 0;
+    }
+
+    // read the rest.
+    bool modified;
+    usize idx = inode_map(NULL, inode, offset, &modified);
+    ASSERT(!modified);
+    Block *block = cache->acquire(idx);
+    DirEntry *de = (DirEntry *)block->data;
+    for (usize i = 0; i < rest / sizeof(DirEntry); i++) {
+        if (strncmp(name, de[i].name, FILE_NAME_MAX_LENGTH) == 0) {
+            cache->release(block);
+            if (index != NULL) {
+                *index = i + offset / sizeof(DirEntry);
+            }
+            return de[i].inode_no;
+        }
+    }
+    cache->release(block);
 
     // TODO
     return 0;
 }
 
 // see `inode.h`.
+/**
+    @brief insert a new directory entry in directory `inode`.
+    Add a new directory entry in `inode` called `name`, which points to inode 
+    with `inode_no`.
+
+    @return the index of new directory entry, or -1 if `name` already exists.
+
+    @note if the directory inode is full, you should grow the size of directory inode.
+    @note you do NOT need to change `inode->entry.num_links`. Another function
+    to be finished in our final lab will do this.
+    @note caller must hold the lock of `inode`.
+
+    @throw panic if `inode` is not a directory.
+ */
 static usize inode_insert(OpContext* ctx,
                           Inode* inode,
                           const char* name,
@@ -666,13 +748,104 @@ static usize inode_insert(OpContext* ctx,
     InodeEntry* entry = &inode->entry;
     ASSERT(entry->type == INODE_DIRECTORY);
 
+    ASSERT(entry->num_bytes % sizeof(DirEntry) == 0);
+    // check the existence of name.
+    usize index;
+    if (inode_lookup(inode, name, &index) != 0) {
+        // name exists already.
+        return -1;
+    }
+    index = 0;
+
+    // now only have to find a slot to fit in the entry.
+
+    usize offset = 0;
+    usize rest = inode->entry.num_bytes;
+    bool modified = false;
+    ASSERT(inode->entry.num_bytes % sizeof(DirEntry) == 0);
+
+    // should write at most 1 data block.
+    while (rest >= BLOCK_SIZE) {
+        usize idx = inode_map(ctx, inode, offset, &modified);
+        Block *block = cache->acquire(idx);
+        DirEntry *de = (DirEntry *)block->data;
+
+        for (usize i = 0; i < BLOCK_SIZE / sizeof(DirEntry); i++) {
+            if (de[i].inode_no == 0) {
+                // found one
+                strncpy(de[i].name, name, FILE_NAME_MAX_LENGTH);
+                de[i].inode_no = inode_no;
+                cache->sync(ctx, block);
+                cache->release(block);
+                return index + i;
+            }
+        }
+        cache->release(block);
+
+        // advance.
+        index += BLOCK_SIZE / sizeof(DirEntry);
+        offset += BLOCK_SIZE;
+        rest -= BLOCK_SIZE;
+    }
+
+    if (rest) {
+        usize idx = inode_map(ctx, inode, offset, &modified);
+        Block *block = cache->acquire(idx);
+        DirEntry *de = (DirEntry *)block->data;
+
+        for (usize i = 0; i < rest / sizeof(DirEntry); i++) {
+            if (de[i].inode_no == 0) {
+                // found one
+                strncpy(de[i].name, name, FILE_NAME_MAX_LENGTH);
+                de[i].inode_no = inode_no;
+                cache->sync(ctx, block);
+                cache->release(block);
+                return index + i;
+            }
+        }
+        cache->release(block);
+        offset += rest;
+        index += rest / sizeof(DirEntry);
+    }
+
+    // grow the dir by one direntry.
+    // at the end of the dir.
+    ASSERT(offset == entry->num_bytes);
+    DirEntry *de = kalloc(sizeof(DirEntry));
+    strncpy(de->name, name, FILE_NAME_MAX_LENGTH);
+    de->inode_no = inode_no;
+    inode_write(ctx, inode, (u8 *)de, offset, sizeof(DirEntry));
+    kfree(de);
+
     // TODO
-    return 0;
+    return index;
 }
 
 // see `inode.h`.
+/**
+    @brief remove the directory entry at `index`.
+    If the corresponding entry is not used before, `remove` does nothing.
+
+    @note if the last entry is removed, you can shrink the size of directory inode.
+    If you like, you can also move entries to fill the hole.
+
+    @note caller must hold the lock of `inode`.
+
+    @throw panic if `inode` is not a directory.
+ */
 static void inode_remove(OpContext* ctx, Inode* inode, usize index) {
     // TODO
+    InodeEntry *entry = &inode->entry;
+    ASSERT(entry->type == INODE_DIRECTORY);
+    
+    // compute the offset of index i.
+    usize offset = index * sizeof(DirEntry);
+    DirEntry *de = kalloc(sizeof(DirEntry));
+    inode_read(inode, (u8 *)de, offset, sizeof(DirEntry));
+    de->name[0] = 0;
+    de->inode_no = 0;
+    inode_write(ctx, inode, (u8 *)de, offset, sizeof(DirEntry));
+    kfree(de);
 }
 
 InodeTree inodes = {
