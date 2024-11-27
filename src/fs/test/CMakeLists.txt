@@ -11,12 +11,12 @@ include_directories(../..)
 
 set(compiler_warnings "-Wall -Wextra")
 set(compiler_flags "${compiler_warnings} \
-    -O1 -ftree-pre -g \
+    -O0 -ftree-pre -g \
     -fno-omit-frame-pointer \
     -fsanitize=undefined \
     -fno-sanitize=alignment")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${compiler_flags}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-parameter ${compiler_flags}")
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} ${compiler_flags}")
 
 file(GLOB mock_sources CONFIGURE_DEPENDS "mock/*.cpp")
@@ -31,3 +31,13 @@ target_link_libraries(inode_test fs mock pthread)
 
 add_executable(cache_test cache_test.cpp)
 target_link_libraries(cache_test fs mock pthread)
+
+# mkfs is a tool to build file system.
+add_executable(mkfs mkfs.c)
+target_link_libraries(mkfs fs mock)
+
+# readfs: read a file in the root dir.
+# It can also read the root dir itself.
+# usage: readfs "/" or readfs <fname>
+add_executable(readfs readfs.c)
+target_link_libraries(readfs fs mock)
