@@ -48,6 +48,10 @@ void main()
 
         arch_fence();
 
+        // start networking
+        // pci_init();
+        // __sync_synchronize();
+
         // Set a flag indicating that the secondary CPUs can start executing.
         boot_secondary_cpus = true;
     } else {

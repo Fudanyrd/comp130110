@@ -8,6 +8,7 @@
 kernel8.*
 *.img
 build/
+*.pcap
 
 # Linker output
 *.ilk
