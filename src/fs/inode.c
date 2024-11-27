@@ -273,7 +273,7 @@ static void inode_sync(OpContext *ctx, Inode *inode, bool do_write)
             // do nothing
         } else {
             // read from disk.
-            Block *block = cache->acquire(inode->inode_no);
+            Block *block = cache->acquire(to_block_no(inode->inode_no));
             ASSERT(block->valid);
             memcpy(&inode->entry,
                    (u8 *)get_entry(block, inode->inode_no % INODE_PER_BLOCK),
