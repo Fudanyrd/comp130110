@@ -10,5 +10,4 @@ fi
 
 make
 cat /dev/zero | head -c 8388608 > sd.img
-./mkfs mkfs.c readfs.c
-hexdump -C sd.img | less
+# hexdump -C sd.img | less

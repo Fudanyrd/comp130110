@@ -7,17 +7,19 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <assert.h>
+#include "mock/file.h"
 
 // clang-format off
 /**
- * Make a 8MB disk, that is 16K blocks!
+ * Make a 8MB disk, that is 16K blocks, allows multilevel 
+ * Inode tree now!
+ * 
  * [sb(1) | (log:64) | (inode:1024) | (bitmap:4) | (data:rest) ]
  *        ^1         ^65            ^1089        ^1093         ^16384
  *        x200       x8200           x88200       x88a00        x800000
  */
 // clang-format on
-
-int disk;
+static int disk;
 static SuperBlock sb;
 static OpContext ctx;
 static BlockCache bc;
@@ -33,10 +35,11 @@ static void end_op(OpContext *ctx);
 static usize cache_alloc(OpContext *ctx);
 static void cache_free(OpContext *ctx, usize block_no);
 static void bitmap_set(uint64_t *buf, usize idx);
-static void add_file(const char *fname);
+static void add_file();
 
 int main(int argc, char **argv)
 {
+    // this is an uninitialized block
     const char *dname = "sd.img";
     disk = open(dname, O_RDWR);
     assert(disk >= 0);
@@ -95,10 +98,11 @@ int main(int argc, char **argv)
     inodes.sync(&ctx, rt, true);
     inodes.put(&ctx, rt);
 
-    for (int i = 1; i < argc; i++) {
-        add_file(argv[i]);
-    }
+    // init file system
+    file_init(&ctx, &bc);
+    add_file();
 
+    // done.
     end_op(&ctx);
     close(disk);
     return 0;
@@ -174,35 +178,68 @@ static void bitmap_set(uint64_t *buf, usize idx)
     buf[offset] |= (1UL << (idx % BIT_PER_ELEM));
 }
 
-static void add_file(const char *fname)
+static void add_file()
 {
-    assert(strlen(fname) < FILE_NAME_MAX_LENGTH);
-    extern InodeTree inodes;
-    static uint8_t buf[512];
+    static char buf[512];
 
-    // read file
-    int fd = open(fname, O_RDONLY);
-    assert(fd > 0);
+    char *m = malloc(sizeof(buf));
 
-    // alloc inode
-    usize inode_no = inodes.alloc(&ctx, INODE_REGULAR);
-    Inode *ino = inodes.get(inode_no);
-    inodes.sync(&ctx, ino, false);
-    Inode *root = inodes.root;
+    char *dst;
+    char *src;
 
-    // insert inode into root directory
-    ino->entry.num_links = 1;
-    inodes.insert(&ctx, root, fname, inode_no);
+    while (fgets(buf, sizeof(buf), stdin)) {
+        // split input
+        dst = (char *)buf + 2;
+        src = dst;
+        while (*src != ' ') {
+            src++;
+        }
+        *src = 0;
+        src++;
 
-    off_t offset = 0;
-    ssize_t nread = read(fd, buf, BLOCK_SIZE);
-    while (nread > 0) {
-        inodes.write(&ctx, ino, buf, offset, nread);
-        offset += nread;
-        nread = read(fd, buf, sizeof(buf));
+        // null terminate
+        char *pt = src;
+        while (*pt != '\n') {
+            pt++;
+        }
+        *pt = 0;
+
+        switch (buf[0]) {
+        case 'm': {
+            // mkdir
+            // usage: m dest 0
+            printf("%d\n", sys_mkdir(dst));
+            break;
+        }
+        case 'a': {
+            // add file
+            // usage: a dest 0
+            printf("%d\n", sys_create(dst, INODE_REGULAR));
+            break;
+        }
+        case 'w': {
+            // write file from existing source
+            // usage: w dest src
+            int fd = open(src, O_RDONLY);
+            int dfd = sys_open(dst, F_RDWR | F_CREAT);
+            long cnt = 0;
+            ssize_t nr = read(fd, m, 512);
+            while (nr > 0) {
+                cnt += sys_write(dfd, m, nr);
+                nr = read(fd, m, 512);
+            }
+            printf("%ld\n", cnt);
+
+            sys_close(dfd);
+            close(fd);
+            break;
+        }
+        default: {
+            free(m);
+            return;
+        }
+        }
     }
-    inodes.sync(&ctx, ino, false);
-    inodes.put(&ctx, ino);
 
-    close(fd);
+    free(m);
 }

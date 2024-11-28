@@ -357,11 +357,6 @@ long sys_write(int fd, char *buf, u64 count)
     if (ino->entry.type != INODE_REGULAR) {
         return -1;
     }
-    if (fobj->offset >= ino->entry.num_bytes) {
-        // cannot read.
-        return 0;
-    }
-
     usize nwrt = inodes.write(ctx, ino, (u8 *)buf, fobj->offset, count);
     fobj->offset += nwrt;
 
