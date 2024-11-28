@@ -759,6 +759,7 @@ static usize inode_insert(OpContext *ctx, Inode *inode, const char *name,
 {
     InodeEntry *entry = &inode->entry;
     ASSERT(entry->type == INODE_DIRECTORY);
+    ASSERT(inode_no != 0);
 
     ASSERT(entry->num_bytes % sizeof(DirEntry) == 0);
     // check the existence of name.

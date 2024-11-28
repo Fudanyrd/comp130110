@@ -21,7 +21,7 @@ void file_init(OpContext *_ctx, BlockCache *_bc)
 {
     ctx = _ctx;
     bc = _bc;
-    proc.cwd = inodes.root;
+    proc.cwd = inodes.share(inodes.root);
     inodes.sync(ctx, proc.cwd, false);
     assert(proc.cwd->valid);
 }
@@ -66,6 +66,7 @@ static Inode *mkdir_here(Inode *start, const char *path)
 {
     assert(strlen(path) < FILE_NAME_MAX_LENGTH);
     assert(start->valid);
+    assert(start->entry.type == INODE_DIRECTORY);
     assert(*path != '/' && *path != 0);
 
     // alloc an inode for dir
@@ -81,8 +82,9 @@ static Inode *mkdir_here(Inode *start, const char *path)
     /// init dir
     init_dir(next);
     next->entry.type = INODE_DIRECTORY;
-    inodes.insert(ctx, next, ".", no);
-    inodes.insert(ctx, next, "..", start->inode_no);
+    // must successs
+    assert(inodes.insert(ctx, next, ".", no) != (usize)-1);
+    assert(inodes.insert(ctx, next, "..", start->inode_no) != (usize)-1);
 
     // done
     inodes.sync(ctx, start, true);
@@ -176,11 +178,13 @@ int sys_create(const char *path, int type)
     switch (type) {
     case (INODE_DIRECTORY): {
         Inode *ret = mkdir_here(ino, buf);
+        assert(ret->valid);
         inodes.put(ctx, ret);
         break;
     }
     case (INODE_REGULAR): {
         Inode *ret = touch_here(ino, buf);
+        assert(ret->valid);
         inodes.put(ctx, ret);
         break;
     }
@@ -198,6 +202,7 @@ int sys_create(const char *path, int type)
 static struct file *fd2file(int fd)
 {
     if (fd < 0 || fd >= 64) {
+        // invalid fd
         return NULL;
     }
     return proc.ofile[fd];
@@ -234,6 +239,7 @@ static int allocfd()
         }
     }
 
+    // cannot alloc: buffer full!
     PANIC();
 }
 
@@ -309,6 +315,7 @@ int sys_close(int fd)
     if (fobj == NULL) {
         return -1;
     }
+    assert(fobj->nlink != 0);
 
     // free the inode
     inodes.put(ctx, fobj->ino);
@@ -375,7 +382,7 @@ long sys_lseek(int fd, u64 offset, int flag)
 
     // we allow seeking dir.
     // in this case the count means dir entry.
-    if (ino->entry.type == INODE_DEVICE) {
+    if (ino->entry.type == INODE_DIRECTORY) {
         assert(fobj->offset % sizeof(DirEntry) == 0);
         offset *= sizeof(DirEntry);
     }
@@ -399,7 +406,9 @@ long sys_lseek(int fd, u64 offset, int flag)
     }
     }
 
-    if (ino->entry.type == INODE_DEVICE) {
+    if (ino->entry.type == INODE_DIRECTORY) {
+        // return the dir entry index
+        // instead of actual offset
         return fobj->offset / sizeof(DirEntry);
     }
     return fobj->offset;
