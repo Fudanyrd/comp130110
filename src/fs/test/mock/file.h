@@ -47,6 +47,8 @@ void file_init(OpContext *ctx, BlockCache *bc);
 int sys_create(const char *path, int type);
 int sys_readdir(int dirfd, DirEntry *dir);
 
+int sys_inode(int fd, InodeEntry *entr);
+
 static inline int sys_mkdir(const char *path)
 {
     return sys_create(path, INODE_DIRECTORY);

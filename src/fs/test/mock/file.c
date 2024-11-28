@@ -216,7 +216,7 @@ int sys_readdir(int dirfd, DirEntry *dir)
     assert(ino != NULL && ino->valid);
     assert(ino->entry.num_bytes >= 2 * sizeof(DirEntry));
 
-    if (fobj->offset > ino->entry.num_bytes) {
+    if (fobj->offset >= ino->entry.num_bytes) {
         // read outside file
         return -1;
     }
@@ -239,6 +239,10 @@ static int allocfd()
 
 int sys_open(const char *path, int prot)
 {
+    if (*path == 0) {
+        // empty path name
+        return -1;
+    }
     static char buf[256];
     Inode *start = *path == '/' ? inodes.share(inodes.root) // absolute
                                   :
@@ -246,10 +250,23 @@ int sys_open(const char *path, int prot)
     while (*path == '/') {
         path++;
     }
+
+    // different from sys_create, it is allowed to
+    // open root directory.
     if (*path == 0) {
-        // empty path name
-        return -1;
-    }
+        Inode *ino = inodes.share(inodes.root);
+        struct file *fobj = malloc(sizeof(struct file));
+        fobj->ino = ino;
+        fobj->nlink = 1;
+        fobj->offset = 0;
+        fobj->prot = 0;
+        fobj->prot |= (prot & F_READ);
+        fobj->prot |= (prot & F_WRITE);
+
+        int fd = allocfd();
+        proc.ofile[fd] = fobj;
+        return fd;
+    } 
 
     Inode *ino = walk(start, path, buf, false);
     if (ino == NULL) {
@@ -391,4 +408,15 @@ long sys_lseek(int fd, u64 offset, int flag)
         return fobj->offset / sizeof(DirEntry);
     }
     return fobj->offset;
+}
+
+int sys_inode(int fd, InodeEntry *entr) {
+    struct file *fobj = fd2file(fd);
+    if (fobj == NULL) {
+        return -1;
+    }
+
+    // copy dinode out
+    memcpy(entr, &(fobj->ino->entry), sizeof(InodeEntry));
+    return 0;
 }
