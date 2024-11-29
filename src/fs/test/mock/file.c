@@ -140,6 +140,65 @@ static Inode *walk(Inode *start, const char *path, char *buf, bool alloc)
     return walk(next, path, buf, alloc);
 }
 
+int sys_unlink(const char *path) {
+    if (*path == 0) {
+        return -1;
+    }
+
+    static char buf[256];
+    Inode *start = *path == '/' ? inodes.share(inodes.root)
+                                  :
+                                  inodes.share(proc.cwd);
+    
+    // skip leading /
+    while (*path == '/') { path ++; }
+    if (*path == 0) {
+        // cannot unlink root
+        inodes.put(ctx, start);
+        return -1;
+    }
+
+    // last but two inode
+    // NOTE: do not need to put start later, 
+    // cause it's done by walk.
+    Inode *ino = walk(start, path, buf, false); 
+    if (ino == NULL) {
+        return -1;
+    }
+    assert(ino->valid && ino->entry.type == INODE_DIRECTORY);
+
+    usize idx;
+    usize dno = inodes.lookup(ino, buf, &idx);
+    if (dno == 0) {
+        // no such file
+        inodes.put(ctx, ino);
+        return -1;
+    }
+
+    // destination
+    Inode *dest = inodes.get(dno);
+    inodes.sync(ctx, dest, false);
+    assert(dest != NULL && dest->valid);
+    assert(dest->entry.num_links > 0);
+    if (dest->entry.type != INODE_REGULAR) {
+        // not a file
+        inodes.put(ctx, ino);
+        inodes.put(ctx, dest);
+        return -1;
+    }
+    dest->entry.num_links--;
+
+    // remove the entry in the dir 
+    inodes.remove(ctx, ino, idx);
+
+    // sync, release
+    inodes.sync(ctx, dest, true);
+    inodes.sync(ctx, ino, true);
+    inodes.put(ctx, ino);
+    inodes.put(ctx, dest);
+    return 0;
+}
+
 int sys_chdir(const char *path) {
     if (*path == 0) {
         return -1;
@@ -163,12 +222,13 @@ int sys_chdir(const char *path) {
     // last but two inode
     Inode *ino = walk(start, path, buf, false); 
     if (ino == NULL) {
-        inodes.put(ctx, start);
         return -1;
     }
     // destination
 
     usize dno = inodes.lookup(ino, buf, NULL);
+    // put ino here, for it is not used later.
+    inodes.put(ctx, ino);
     if (dno == 0) {
         // path not exist
         return -1;
@@ -176,13 +236,13 @@ int sys_chdir(const char *path) {
     Inode *dest = inodes.get(dno);
     inodes.sync(ctx, dest, false);
     assert(dest != NULL && dest->valid);
-    inodes.put(ctx, start);
     if (dest->entry.type != INODE_DIRECTORY) {
         // not a dir, fail
         inodes.put(ctx, dest);
         return -1;
     }
     // release prev cwd
+    // , and update cwd to dest
     inodes.put(ctx, proc.cwd);
     proc.cwd = dest;
 
@@ -228,12 +288,14 @@ int sys_create(const char *path, int type)
     case (INODE_DIRECTORY): {
         Inode *ret = mkdir_here(ino, buf);
         assert(ret->valid);
+        assert(ret->entry.type == INODE_DIRECTORY);
         inodes.put(ctx, ret);
         break;
     }
     case (INODE_REGULAR): {
         Inode *ret = touch_here(ino, buf);
         assert(ret->valid);
+        assert(ret->entry.type == INODE_REGULAR);
         inodes.put(ctx, ret);
         break;
     }
@@ -274,10 +336,18 @@ int sys_readdir(int dirfd, DirEntry *dir)
         // read outside file
         return -1;
     }
-    inodes.read(ino, (u8 *)dir, fobj->offset, sizeof(DirEntry));
-    fobj->offset += sizeof(DirEntry);
 
-    return 0;
+    while (fobj->offset < ino->entry.num_bytes) {
+        inodes.read(ino, (u8 *)dir, fobj->offset, sizeof(DirEntry));
+        fobj->offset += sizeof(DirEntry);
+        if (dir->inode_no != 0) {
+            // a valid entry. 
+            return 0;
+        }
+    }
+
+    // no entry found since fob->offset.
+    return -1;
 }
 
 static int allocfd()
@@ -320,6 +390,7 @@ int sys_open(const char *path, int prot)
 
         int fd = allocfd();
         proc.ofile[fd] = fobj;
+        inodes.put(ctx, start);
         return fd;
     } 
 
@@ -333,6 +404,7 @@ int sys_open(const char *path, int prot)
     Inode *fino;
     if (no == 0) {
         if ((prot & F_CREAT) == 0) {
+            inodes.put(ctx, ino);
             return -1;
         }
         // create file
@@ -353,6 +425,9 @@ int sys_open(const char *path, int prot)
     fobj->prot |= (prot & F_READ);
     fobj->prot |= (prot & F_WRITE);
 
+    // do not put fino, for it is used in `file` struct.
+    // but, the dir inode `ino` should be put.
+    inodes.put(ctx, ino);
     int fd = allocfd();
     proc.ofile[fd] = fobj;
     return fd;

@@ -48,6 +48,11 @@ int sys_create(const char *path, int type);
 int sys_chdir(const char *path);
 int sys_readdir(int dirfd, DirEntry *dir);
 
+// unlink a file
+int sys_unlink(const char *path);
+// remove a dir
+int sys_rmdir(const char *path);
+
 int sys_inode(int fd, InodeEntry *entr);
 
 static inline int sys_mkdir(const char *path)

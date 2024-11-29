@@ -172,6 +172,10 @@ static void check_file_or_dir(const char *fname)
     static char buf[512];
 
     int fd = sys_open(fname, F_RDONLY);
+    if (fd < 0) {
+        fprintf(stderr, "%s: No such file or directory.\n", fname);
+        return;
+    }
 
     // print inode info
     static InodeEntry entry;
@@ -203,6 +207,7 @@ static void shell(void)
     char *dst;
     char *src;
 
+    write(1, "< ", 2);
     while (fgets(buf, sizeof(buf), stdin)) {
         // split input
         dst = (char *)buf + 2;
@@ -225,6 +230,12 @@ static void shell(void)
             // mkdir
             // usage: m dest 0
             printf("%d\n", sys_mkdir(dst));
+            break;
+        }
+        case 'u': {
+            // unlink file
+            // usage: m dest 0
+            printf("%d\n", sys_unlink(dst));
             break;
         }
         case 'a': {
@@ -262,9 +273,11 @@ static void shell(void)
             break;
         }
         default: {
+            free(m);
             return;
         }
         }
+        write(1, "< ", 2);
     }
 
     free(m);
