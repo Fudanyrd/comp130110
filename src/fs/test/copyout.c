@@ -238,6 +238,12 @@ static void shell(void)
             printf("%d\n", sys_unlink(dst));
             break;
         }
+        case 'd': {
+            // unlink empty dir
+            // usage: d dest 0
+            printf("%d\n", sys_rmdir(dst));
+            break;
+        }
         case 'a': {
             // add file
             // usage: a dest 0

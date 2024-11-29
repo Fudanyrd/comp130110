@@ -11,6 +11,13 @@
  * Specification: each of these method should put the inodes
  * it uses. They should use inodes.share() when accessing
  * inodes.root and proc.cwd
+ * 
+ * We do NOT allow deleting an unempty directory.
+ * 
+ * In my design, the number of links of a directory equals to 
+ * its number of entries(except . and ..) plus 1. Then, when 
+ * the number of links drop to 0, we know that it has no entry
+ * in it and can remove it.
  */
 
 static OpContext *ctx;
@@ -51,6 +58,9 @@ static Inode *touch_here(Inode *start, const char *path)
         PANIC();
     }
 
+    // increment number of links
+    start->entry.num_links++;
+
     // init the file.
     init_dir(next);
     next->entry.type = INODE_REGULAR;
@@ -78,6 +88,9 @@ static Inode *mkdir_here(Inode *start, const char *path)
         // already exists, this should not happen
         PANIC();
     }
+
+    // increment number of links
+    start->entry.num_links++;
 
     /// init dir
     init_dir(next);
@@ -140,18 +153,20 @@ static Inode *walk(Inode *start, const char *path, char *buf, bool alloc)
     return walk(next, path, buf, alloc);
 }
 
-int sys_unlink(const char *path) {
+int sys_unlink(const char *path)
+{
     if (*path == 0) {
         return -1;
     }
 
     static char buf[256];
-    Inode *start = *path == '/' ? inodes.share(inodes.root)
-                                  :
+    Inode *start = *path == '/' ? inodes.share(inodes.root) :
                                   inodes.share(proc.cwd);
-    
+
     // skip leading /
-    while (*path == '/') { path ++; }
+    while (*path == '/') {
+        path++;
+    }
     if (*path == 0) {
         // cannot unlink root
         inodes.put(ctx, start);
@@ -159,9 +174,9 @@ int sys_unlink(const char *path) {
     }
 
     // last but two inode
-    // NOTE: do not need to put start later, 
+    // NOTE: do not need to put start later,
     // cause it's done by walk.
-    Inode *ino = walk(start, path, buf, false); 
+    Inode *ino = walk(start, path, buf, false);
     if (ino == NULL) {
         return -1;
     }
@@ -188,7 +203,12 @@ int sys_unlink(const char *path) {
     }
     dest->entry.num_links--;
 
-    // remove the entry in the dir 
+    // by specification, also decrease # links
+    // of the dir.
+    assert(ino->entry.num_links > 1);
+    ino->entry.num_links--;
+
+    // remove the entry in the dir
     inodes.remove(ctx, ino, idx);
 
     // sync, release
@@ -199,18 +219,122 @@ int sys_unlink(const char *path) {
     return 0;
 }
 
-int sys_chdir(const char *path) {
+int sys_rmdir(const char *path)
+{
     if (*path == 0) {
         return -1;
     }
 
     static char buf[256];
-    Inode *start = *path == '/' ? inodes.share(inodes.root)
-                                  :
+    Inode *start = *path == '/' ? inodes.share(inodes.root) :
                                   inodes.share(proc.cwd);
 
     // skip leading /
-    while (*path == '/') { path ++; }
+    while (*path == '/') {
+        path++;
+    }
+    if (*path == 0) {
+        // cannot unlink root
+        inodes.put(ctx, start);
+        return -1;
+    }
+
+    // last but two inode
+    // NOTE: do not need to put start later,
+    // cause it's done by walk.
+    Inode *ino = walk(start, path, buf, false);
+    if (ino == NULL) {
+        return -1;
+    }
+    assert(ino->valid && ino->entry.type == INODE_DIRECTORY);
+
+    usize idx;
+    usize dno = inodes.lookup(ino, buf, &idx);
+    // free ino for it's not used later.
+    // inodes.sync(ctx, ino, true);
+    inodes.put(ctx, ino);
+    ino = NULL;
+    if (dno == 0) {
+        // no such file
+        return -1;
+    }
+
+    // destination
+    Inode *dest = inodes.get(dno);
+    inodes.sync(ctx, dest, false);
+    assert(dest != NULL && dest->valid);
+    assert(dest->entry.num_links > 0);
+    if (dest->entry.type != INODE_DIRECTORY) {
+        // not a file
+        inodes.put(ctx, dest);
+        return -1;
+    }
+    if (dest->entry.num_links != 1) {
+        // this is not an empty dir.
+        // do NOT delete, fail
+        inodes.put(ctx, dest);
+        return -1;
+    }
+    dest->entry.num_links--;
+
+    // by specification, also decrease # links
+    // of the dir.
+    // NOTE: ino is NOT necessarily the parent of
+    // dest. Eg. the path may be "./"
+    // Need to find the parent and decrement
+    // nlinks.
+    usize pno = inodes.lookup(dest, "..", &idx);
+    assert(pno != 0);
+    Inode *parent = inodes.get(pno);
+    assert(parent != NULL);
+    assert(parent->entry.num_bytes > 2 * sizeof(DirEntry));
+    assert(parent->entry.num_bytes % sizeof(DirEntry) == 0);
+    assert(parent->entry.num_links > 1);
+    parent->entry.num_links--;
+    // remove the node in parent dir.
+
+    // create a temporary buffer instead of use static buffer
+    // to avoid race
+    DirEntry *de = malloc(sizeof(DirEntry));
+    de->inode_no = 0;
+    assert(de != NULL);
+    usize offset = 0;
+    while (offset < parent->entry.num_bytes) {
+        inodes.read(parent, (u8 *)de, offset, sizeof(DirEntry));
+        if (de->inode_no == dno) {
+            break;
+        }
+        offset += sizeof(DirEntry);
+    }
+    assert(de->inode_no == dno);
+    // clear the entry, and write back.
+    de->inode_no = 0;
+    de->name[0] = 0;
+    inodes.write(ctx, parent, (u8 *)de, offset, sizeof(DirEntry));
+    free(de);
+    inodes.sync(ctx, parent, true);
+    inodes.put(ctx, parent);
+
+    // sync, release
+    inodes.sync(ctx, dest, true);
+    inodes.put(ctx, dest);
+    return 0;
+}
+
+int sys_chdir(const char *path)
+{
+    if (*path == 0) {
+        return -1;
+    }
+
+    static char buf[256];
+    Inode *start = *path == '/' ? inodes.share(inodes.root) :
+                                  inodes.share(proc.cwd);
+
+    // skip leading /
+    while (*path == '/') {
+        path++;
+    }
     if (*path == 0) {
         // change to root dir
         inodes.put(ctx, start);
@@ -220,7 +344,7 @@ int sys_chdir(const char *path) {
     }
 
     // last but two inode
-    Inode *ino = walk(start, path, buf, false); 
+    Inode *ino = walk(start, path, buf, false);
     if (ino == NULL) {
         return -1;
     }
@@ -266,7 +390,9 @@ int sys_create(const char *path, int type)
     inodes.sync(ctx, start, false);
     assert(start->valid);
 
-    while (*path == '/') { path ++; }
+    while (*path == '/') {
+        path++;
+    }
     if (*path == 0) {
         inodes.put(ctx, start);
         return -1;
@@ -341,7 +467,7 @@ int sys_readdir(int dirfd, DirEntry *dir)
         inodes.read(ino, (u8 *)dir, fobj->offset, sizeof(DirEntry));
         fobj->offset += sizeof(DirEntry);
         if (dir->inode_no != 0) {
-            // a valid entry. 
+            // a valid entry.
             return 0;
         }
     }
@@ -392,7 +518,7 @@ int sys_open(const char *path, int prot)
         proc.ofile[fd] = fobj;
         inodes.put(ctx, start);
         return fd;
-    } 
+    }
 
     Inode *ino = walk(start, path, buf, false);
     if (ino == NULL) {
@@ -538,7 +664,8 @@ long sys_lseek(int fd, long offset, int flag)
     return fobj->offset;
 }
 
-int sys_inode(int fd, InodeEntry *entr) {
+int sys_inode(int fd, InodeEntry *entr)
+{
     struct file *fobj = fd2file(fd);
     if (fobj == NULL) {
         return -1;
