@@ -104,7 +104,7 @@ typedef struct Proc {
     struct list children;
     struct list_elem ptnode; // put on parent's children list.
     struct list_elem schq; // put on scheduler queue
-    void *chan;
+    // void *chan;
 
     enum procstate state;
     Semaphore childexit;
