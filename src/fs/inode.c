@@ -108,6 +108,10 @@ static INLINE u32 *get_addrs(Block *block)
 // initialize inode tree.
 void init_inodes(const SuperBlock *_sblock, const BlockCache *_cache)
 {
+    // FIXME: should use static_assertion.
+    ASSERT(sizeof(IndirectBlock) == BLOCK_SIZE);
+    ASSERT(INODE_MAX_BYTES >= 1 * 1024 * 1024);
+
     init_spinlock(&lock);
     sblock = _sblock;
     cache = _cache;
@@ -327,6 +331,61 @@ static Inode *inode_get(usize inode_no)
     return ino;
 }
 
+/**
+ * Recursively free an indirect block.
+ */
+static void inode_rm_indir(OpContext *ctx, u32 *idx)
+{
+    if (*idx == 0) {
+        // not mapped
+        return;
+    }
+
+    Block *indir_block = cache->acquire(*idx);
+    u32 *links = (u32 *)indir_block->data;
+
+    for (usize i = 0; i < INODE_NUM_INDIRECT; i++) {
+        // i <= 128
+        // free data block
+        if (links[i] != 0) {
+            cache->free(ctx, links[i]);
+            links[i] = 0;
+        }
+    }
+    cache->sync(ctx, indir_block);
+    cache->release(indir_block);
+
+    // free the indirect block itself
+    cache->free(ctx, *idx);
+    // mark as deallocated
+    *idx = 0;
+    return;
+}
+
+/** Recursively free an doubly-indirect block */
+static void inode_rm_dindir(OpContext *ctx, u32 *idx)
+{
+    if (*idx == 0) {
+        return;
+    }
+
+    Block *dindir_block = cache->acquire(*idx);
+    u32 *links = (u32 *)dindir_block->data;
+    for (usize i = 0; i < INODE_NUM_INDIRECT; i++) {
+        // recursively remove this "indirect block".
+        inode_rm_indir(ctx, &links[i]);
+    }
+
+    cache->sync(ctx, dindir_block);
+    cache->release(dindir_block);
+
+    // free the doubly-indirect block itself
+    cache->free(ctx, *idx);
+    // mark as deallocated
+    *idx = 0;
+    return;
+}
+
 // see `inode.h`.
 /**
     @brief truncate all contents of `inode`.
@@ -351,19 +410,11 @@ static void inode_clear(OpContext *ctx, Inode *inode)
     }
 
     // free the indirect data block.
-    usize indirect = inode->entry.indirect;
-    if (indirect != 0) {
-        Block *indir = cache->acquire(indirect);
-        u32 *arr = (u32 *)indir->data;
-        for (usize i = 0; i < INODE_NUM_INDIRECT; i++) {
-            if (arr[i] != 0) {
-                cache->free(ctx, arr[i]);
-            }
-        }
-        cache->release(indir);
-        cache->free(ctx, indirect);
-    }
-    inode->entry.indirect = 0;
+    inode_rm_indir(ctx, &(inode->entry.indirect));
+    ASSERT(inode->entry.indirect == 0);
+    // free doubly-indirect block
+    inode_rm_dindir(ctx, &(inode->entry.dindirect));
+    ASSERT(inode->entry.dindirect == 0);
     inode->entry.num_bytes = 0;
     inode_sync(ctx, inode, true);
 }
@@ -423,6 +474,80 @@ static void inode_put(OpContext *ctx, Inode *inode)
     }
 }
 
+/** Same as inode_map, but will look at indirect block 
+ * @param idx pointer to the indirect pointer in inode or
+ *   doubly-indirect block
+ * @param[out] modified whether the value of idx is modified
+ */
+static usize inode_map_indirect(OpContext *ctx, u32 *idx, usize offset,
+                                bool *modified)
+{
+    ASSERT(offset < INODE_NUM_INDIRECT * BLOCK_SIZE);
+    usize ret = 0;
+    if (*idx == 0) {
+        // should allocate indirect block
+        if (ctx == NULL) {
+            // fail
+            return 0;
+        }
+
+        *modified = true;
+        *idx = cache->alloc(ctx);
+        ASSERT(*idx != 0);
+    }
+
+    Block *indir_block = cache->acquire(*idx);
+    u32 *links = (u32 *)indir_block->data;
+    if (links[offset / BLOCK_SIZE] == 0 && ctx != NULL) {
+        // should allocate a data block
+        // do not have to mark modified, for this change does
+        // not happen on inode
+        links[offset / BLOCK_SIZE] = cache->alloc(ctx);
+        // but, should sync this indirect block.
+        cache->sync(ctx, indir_block);
+    }
+    ret = links[offset / BLOCK_SIZE];
+    cache->release(indir_block);
+
+    return ret;
+}
+
+/** Map at doubly-indirect block 
+ * @param idx pointer to doubly-indirect pointer in inode.
+ * @param[out] modified whether the value of idx is modified
+ */
+static usize inode_map_dindir(OpContext *ctx, u32 *idx, usize offset,
+                              bool *modified)
+{
+    const usize BYTE_DINDIR = INODE_NUM_INDIRECT * BLOCK_SIZE;
+    ASSERT(offset < INODE_NUM_DINDIRECT * BLOCK_SIZE);
+    usize ret = 0;
+    if (*idx == 0) {
+        // should allocate doubly-indirect block
+        if (ctx == NULL) {
+            return 0;
+        }
+
+        *modified = true;
+        *idx = cache->alloc(ctx);
+        ASSERT(*idx != 0);
+    }
+
+    Block *dindir_block = cache->acquire(*idx);
+    u32 *links = (u32 *)dindir_block->data;
+    bool tmp __attribute__((unused));
+
+    // since this is not modification to inode,
+    // do NOT set modified.
+    ret = inode_map_indirect(ctx, &links[offset / BYTE_DINDIR],
+                             offset % BYTE_DINDIR, &tmp);
+    if (tmp) {
+        cache->sync(ctx, dindir_block);
+    }
+    cache->release(dindir_block);
+    return ret;
+}
+
 /**
     @brief get which block is the offset of the inode in.
 
@@ -475,30 +600,21 @@ static usize inode_map(OpContext *ctx, Inode *inode, usize offset,
     // search from indirect block.
     offset -= INODE_NUM_DIRECT * BLOCK_SIZE;
     usize ret = 0;
-    if (inode->entry.indirect == 0) {
-        if (ctx == NULL) {
-            goto bad_ctx;
-        }
-        // allocate for indirect block
-        *modified = true;
-        inode->entry.indirect = cache->alloc(ctx);
-    }
-    Block *indir_blk = cache->acquire(inode->entry.indirect);
-    u32 *indir_arr = (u32 *)indir_blk->data;
-    if (indir_arr[offset / BLOCK_SIZE] == 0) {
-        if (ctx == NULL) {
-            goto bad_ctx;
-        }
-        // allocate an data block
-        ret = cache->alloc(ctx);
-        indir_arr[offset / BLOCK_SIZE] = ret;
 
-        // there's write, so must sync.
-        cache->sync(ctx, indir_blk);
-    } else {
-        ret = indir_arr[offset / BLOCK_SIZE];
+    if (offset < INODE_NUM_INDIRECT * BLOCK_SIZE) {
+        ret = inode_map_indirect(ctx, &(inode->entry.indirect), offset,
+                                 modified);
+        if (*modified) {
+            ASSERT(ctx != NULL);
+        }
+        return ret;
     }
-    cache->release(indir_blk);
+    offset -= INODE_NUM_INDIRECT * BLOCK_SIZE;
+    ASSERT(offset < INODE_NUM_DINDIRECT * BLOCK_SIZE);
+    ret = inode_map_dindir(ctx, &(inode->entry.dindirect), offset, modified);
+    if (*modified) {
+        ASSERT(ctx != NULL);
+    }
     return ret;
 
 bad_ctx:
