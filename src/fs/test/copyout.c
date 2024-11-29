@@ -139,13 +139,14 @@ static usize cache_alloc(OpContext *ctx)
 {
     // allocate bitmap block
     usize ret = -1;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 8; i++) {
         Block *bm = acquire(sb.bitmap_start + i);
         for (usize k = 0; k < BIT_PER_BLOCK; k++) {
             if (!bitmap_get((uint64_t *)bm->data, k)) {
                 bitmap_set((uint64_t *)bm->data, k);
                 cache_sync(ctx, bm);
                 ret = k + i * BIT_PER_BLOCK;
+                break;
             }
         }
         release(bm);

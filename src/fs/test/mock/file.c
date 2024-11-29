@@ -287,6 +287,8 @@ int sys_rmdir(const char *path)
     assert(pno != 0);
     Inode *parent = inodes.get(pno);
     assert(parent != NULL);
+    inodes.sync(ctx, parent, false);
+    assert(parent->valid);
     assert(parent->entry.num_bytes > 2 * sizeof(DirEntry));
     assert(parent->entry.num_bytes % sizeof(DirEntry) == 0);
     assert(parent->entry.num_links > 1);

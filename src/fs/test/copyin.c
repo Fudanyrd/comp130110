@@ -11,12 +11,12 @@
 
 // clang-format off
 /**
- * Make a 8MB disk, that is 16K blocks, allows multilevel 
+ * Make a 16MB disk, that is 32K blocks, allows multilevel 
  * Inode tree now!
  * 
- * [sb(1) | (log:64) | (inode:1024) | (bitmap:4) | (data:rest) ]
- *        ^1         ^65            ^1089        ^1093         ^16384
- *        x200       x8200           x88200       x88a00        x800000
+ * [sb(1) | (log:64) | (inode:1024) | (bitmap:8) | (data:rest) ]
+ *        ^1         ^65            ^1089        ^1097         ^32768
+ *        x200       x8200           x88200       x89200        x1000000
  */
 // clang-format on
 static int disk;
@@ -45,13 +45,13 @@ int main(int argc, char **argv)
     assert(disk >= 0);
 
     // init superblock
-    sb.num_blocks = 16 * 1024;
+    sb.num_blocks = 32 * 1024;
     sb.log_start = 1;
     sb.num_log_blocks = 64;
     sb.inode_start = 65;
     sb.num_inodes = 1024;
     sb.bitmap_start = 1089;
-    sb.num_data_blocks = 15291;
+    sb.num_data_blocks = 31671;
 
     // init block cache
     bc.acquire = acquire;
@@ -64,7 +64,7 @@ int main(int argc, char **argv)
     bc.sync = cache_sync;
 
     // init alloc_no
-    alloc_no = 1093;
+    alloc_no = 1097;
 
     // write superblock
     Block *block;
