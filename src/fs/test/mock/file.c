@@ -140,6 +140,55 @@ static Inode *walk(Inode *start, const char *path, char *buf, bool alloc)
     return walk(next, path, buf, alloc);
 }
 
+int sys_chdir(const char *path) {
+    if (*path == 0) {
+        return -1;
+    }
+
+    static char buf[256];
+    Inode *start = *path == '/' ? inodes.share(inodes.root)
+                                  :
+                                  inodes.share(proc.cwd);
+
+    // skip leading /
+    while (*path == '/') { path ++; }
+    if (*path == 0) {
+        // change to root dir
+        inodes.put(ctx, start);
+        inodes.put(ctx, proc.cwd);
+        proc.cwd = inodes.share(inodes.root);
+        return 0;
+    }
+
+    // last but two inode
+    Inode *ino = walk(start, path, buf, false); 
+    if (ino == NULL) {
+        inodes.put(ctx, start);
+        return -1;
+    }
+    // destination
+
+    usize dno = inodes.lookup(ino, buf, NULL);
+    if (dno == 0) {
+        // path not exist
+        return -1;
+    }
+    Inode *dest = inodes.get(dno);
+    inodes.sync(ctx, dest, false);
+    assert(dest != NULL && dest->valid);
+    inodes.put(ctx, start);
+    if (dest->entry.type != INODE_DIRECTORY) {
+        // not a dir, fail
+        inodes.put(ctx, dest);
+        return -1;
+    }
+    // release prev cwd
+    inodes.put(ctx, proc.cwd);
+    proc.cwd = dest;
+
+    return 0;
+}
+
 int sys_create(const char *path, int type)
 {
     if (*path == 0) {
@@ -370,7 +419,7 @@ long sys_write(int fd, char *buf, u64 count)
     return nwrt;
 }
 
-long sys_lseek(int fd, u64 offset, int flag)
+long sys_lseek(int fd, long offset, int flag)
 {
     struct file *fobj = fd2file(fd);
     if (fobj == NULL || fobj->ino) {

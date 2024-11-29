@@ -21,6 +21,7 @@
 int disk;
 static SuperBlock sb;
 static BlockCache bc;
+static OpContext ctx;
 static usize alloc_no;
 extern InodeTree inodes;
 
@@ -34,11 +35,32 @@ static void end_op(OpContext *ctx);
 static usize cache_alloc(OpContext *ctx);
 static void cache_free(OpContext *ctx, usize block_no);
 static void check_file_or_dir(const char *fname);
+static void shell(void);
+
+#define BIT_PER_ELEM (sizeof(uint64_t) * 8)
+static inline bool bitmap_get(uint64_t *buf, usize idx)
+{
+    assert(idx < BIT_PER_BLOCK);
+    usize off = idx / BIT_PER_ELEM;
+    return (buf[off] & (1UL << (idx % BIT_PER_ELEM))) != 0;
+}
+static void bitmap_set(uint64_t *buf, usize idx)
+{
+    assert(idx < BIT_PER_BLOCK);
+    usize offset = idx / BIT_PER_ELEM;
+    buf[offset] |= (1UL << (idx % BIT_PER_ELEM));
+}
+static void bitmap_clear(uint64_t *buf, usize idx)
+{
+    assert(idx < BIT_PER_BLOCK);
+    usize offset = idx / BIT_PER_ELEM;
+    buf[offset] &= (~(1UL << (idx % BIT_PER_ELEM)));
+}
 
 int main(int argc, char **argv)
 {
     const char *dname = "sd.img";
-    disk = open(dname, O_RDONLY);
+    disk = open(dname, O_RDWR);
     assert(disk >= 0);
 
     // init superblock
@@ -61,11 +83,9 @@ int main(int argc, char **argv)
     // init inode tree
     init_inodes(&sb, &bc);
     // init file system
-    file_init(NULL, &bc);
+    file_init(&ctx, &bc);
 
-    for (int i = 1; i < argc; i++) {
-        check_file_or_dir(argv[i]);
-    }
+    shell();
 
     end_op(NULL);
     close(disk);
@@ -104,6 +124,9 @@ static void begin_op(OpContext *ctx)
 
 static void cache_sync(OpContext *ctx, Block *block)
 {
+    off_t offset = BLOCK_SIZE * block->block_no;
+    assert(lseek(disk, offset, SEEK_SET) == offset);
+    assert(write(disk, block->data, BLOCK_SIZE) >= 0);
     return;
 }
 
@@ -114,14 +137,34 @@ static void end_op(OpContext *ctx)
 
 static usize cache_alloc(OpContext *ctx)
 {
-    fprintf(stderr, "readfs does not do write\n");
+    // allocate bitmap block
+    usize ret = -1;
+    for (int i = 0; i < 4; i++) {
+        Block *bm = acquire(sb.bitmap_start + i);
+        for (usize k = 0; k < BIT_PER_BLOCK; k++) {
+            if (!bitmap_get((uint64_t *)bm->data, k)) {
+                bitmap_set((uint64_t *)bm->data, k);
+                cache_sync(ctx, bm);
+                ret = k + i * BIT_PER_BLOCK;
+            }
+        }
+        release(bm);
+        if (ret != (usize)-1) {
+            return ret;
+        }
+    }
+
+    // cannot allocate
+    fprintf(stderr, "disk full\n");
     assert(0);
 }
 
 static void cache_free(OpContext *ctx, usize block_no)
 {
-    fprintf(stderr, "Fatal: should not free block when making disk image!\n");
-    exit(1);
+    Block *bm = acquire(sb.bitmap_start + block_no / BIT_PER_BLOCK);
+    bitmap_clear((uint64_t *)bm->data, block_no % BIT_PER_BLOCK);
+    cache_sync(ctx, bm);
+    release(bm);
 }
 
 static void check_file_or_dir(const char *fname)
@@ -149,4 +192,80 @@ static void check_file_or_dir(const char *fname)
     }
 
     sys_close(fd);
+}
+
+static void shell(void)
+{
+    static char buf[512];
+
+    char *m = malloc(sizeof(buf));
+
+    char *dst;
+    char *src;
+
+    while (fgets(buf, sizeof(buf), stdin)) {
+        // split input
+        dst = (char *)buf + 2;
+        src = dst;
+        while (*src != ' ') {
+            src++;
+        }
+        *src = 0;
+        src++;
+
+        // null terminate
+        char *pt = src;
+        while (*pt != '\n') {
+            pt++;
+        }
+        *pt = 0;
+
+        switch (buf[0]) {
+        case 'm': {
+            // mkdir
+            // usage: m dest 0
+            printf("%d\n", sys_mkdir(dst));
+            break;
+        }
+        case 'a': {
+            // add file
+            // usage: a dest 0
+            printf("%d\n", sys_create(dst, INODE_REGULAR));
+            break;
+        }
+        case 'c': {
+            // change directory
+            // usage: c dest 0
+            printf("%d\n", sys_chdir(dst));
+            break;
+        }
+        case 'w': {
+            // write file from existing source
+            // usage: w dest src
+            int fd = open(src, O_RDONLY);
+            int dfd = sys_open(dst, F_RDWR | F_CREAT);
+            long cnt = 0;
+            ssize_t nr = read(fd, m, 512);
+            while (nr > 0) {
+                cnt += sys_write(dfd, m, nr);
+                nr = read(fd, m, 512);
+            }
+            printf("%ld\n", cnt);
+
+            sys_close(dfd);
+            close(fd);
+            break;
+        }
+        case 'r': {
+            // read file or dir
+            check_file_or_dir(dst);
+            break;
+        }
+        default: {
+            return;
+        }
+        }
+    }
+
+    free(m);
 }
