@@ -1,12 +1,10 @@
 #pragma once
 #ifndef _FS_CONDVAR_
-#define _FS_COND_VAR_
+#define _FS_CONDVAR_
 
 #include <common/sem.h>
 #include <common/spinlock.h>
 #include <common/defines.h>
-#include <fdutil/stdint.h>
-#include <fdutil/stddef.h>
 
 struct condvar {
     u32 waitcnt; // number of waiting threads
