@@ -7,7 +7,8 @@ void cond_wait(struct condvar *cv, SpinLock *lock)
     cv->waitcnt++;
     // release holding lock, and goto sleep
     release_spinlock(lock);
-    unalertable_wait_sem(&cv->sema);
+    // unalertable_wait_sem(&cv->sema);
+    ASSERT(_wait_sem(&cv->sema, false));
     // reacquire lock
     acquire_spinlock(lock);
 }

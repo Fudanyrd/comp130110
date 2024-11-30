@@ -15,23 +15,6 @@
 #undef Log
 #define Log(fmt, ...)
 
-static void sleep(void *chan, SpinLock *lock) __attribute__((unused));
-static void wakeup(struct Proc *p, void *chan) __attribute__((unused));
-static void sleep(void *chan, SpinLock *lock)
-{
-    acquire_sched_lock();
-    myproc->chan = chan;
-    release_spinlock(lock);
-    sched(SLEEPING);
-    // reacquire lock
-    acquire_spinlock(lock);
-}
-static void wakeup(struct Proc *p, void *chan)
-{
-    if (p->state == SLEEPING && p->chan == chan)
-        activate_proc(p);
-}
-
 static int nextid = 1;
 static SpinLock pid_lock;
 static int allocpid()
@@ -112,7 +95,7 @@ void init_proc(Proc *p)
     p->pid = allocpid();
     p->exitcode = 0;
     p->parent = NULL;
-    p->chan = NULL;
+    // p->chan = NULL;
     list_init(&p->children);
     init_sem(&p->childexit, 0);
     // kstack is allocated in init_proc(),

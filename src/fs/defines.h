@@ -11,10 +11,16 @@
 // maximum number of distinct block numbers can be recorded in the log header.
 #define LOG_MAX_SIZE ((BLOCK_SIZE - sizeof(usize)) / sizeof(usize))
 
-#define INODE_NUM_DIRECT 12
+#define INODE_NUM_DIRECT 11
+// 128
 #define INODE_NUM_INDIRECT (BLOCK_SIZE / sizeof(u32))
+// (128 * 128)
+#define INODE_NUM_DINDIRECT (INODE_NUM_INDIRECT * INODE_NUM_INDIRECT)
+
 #define INODE_PER_BLOCK (BLOCK_SIZE / sizeof(InodeEntry))
-#define INODE_MAX_BLOCKS (INODE_NUM_DIRECT + INODE_NUM_INDIRECT)
+// (11 + 128 + 128 * 128)
+#define INODE_MAX_BLOCKS \
+    (INODE_NUM_DIRECT + INODE_NUM_INDIRECT + INODE_NUM_DINDIRECT)
 #define INODE_MAX_BYTES (INODE_MAX_BLOCKS * BLOCK_SIZE)
 
 #define DIRENTR_PER_BLOCK (BLOCK_SIZE / sizeof(DirEntry))
@@ -58,6 +64,7 @@ typedef struct dinode {
     u32 num_bytes; // number of bytes in the file, i.e. the size of file.
     u32 addrs[INODE_NUM_DIRECT]; // direct addresses/block numbers.
     u32 indirect; // the indirect address block.
+    u32 dindirect; // doubly-indirect address block
 } InodeEntry;
 
 // the block pointed by `InodeEntry.indirect`.

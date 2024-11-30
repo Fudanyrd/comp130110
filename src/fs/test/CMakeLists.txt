@@ -22,6 +22,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} ${compiler_flags}")
 file(GLOB mock_sources CONFIGURE_DEPENDS "mock/*.cpp")
 add_library(mock STATIC ${mock_sources})
 
+add_library(file STATIC "mock/file.c")
+
 file(GLOB fs_sources CONFIGURE_DEPENDS "../*.c")
 add_library(fs STATIC ${fs_sources} "instrument.c")
 target_compile_options(fs PUBLIC "-fno-builtin")
@@ -41,3 +43,9 @@ target_link_libraries(mkfs fs mock)
 # usage: readfs "/" or readfs <fname>
 add_executable(readfs readfs.c)
 target_link_libraries(readfs fs mock)
+
+add_executable(copyin copyin.c)
+target_link_libraries(copyin fs mock file)
+
+add_executable(copyout copyout.c)
+target_link_libraries(copyout fs mock file)
