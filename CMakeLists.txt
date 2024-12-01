@@ -27,7 +27,7 @@ get_property(kernel_image GLOBAL PROPERTY kernel_image_path)
 get_property(sd_image GLOBAL PROPERTY sd_image_path)
 
 set(qemu_flags
-    -machine virt,gic-version=3,highmen-ecam=off
+    -machine virt,gic-version=3,highmem-ecam=off
     -cpu cortex-a72
     -smp 4
     -m 4096
