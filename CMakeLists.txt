@@ -27,7 +27,7 @@ get_property(kernel_image GLOBAL PROPERTY kernel_image_path)
 get_property(sd_image GLOBAL PROPERTY sd_image_path)
 
 set(qemu_flags
-    -machine virt,gic-version=3
+    -machine virt,gic-version=3,highmen-ecam=off
     -cpu cortex-a72
     -smp 4
     -m 4096
@@ -37,10 +37,14 @@ set(qemu_flags
     -global virtio-mmio.force-legacy=false
     -drive file=${sd_image},if=none,format=raw,id=d0
     -device virtio-blk-device,drive=d0,bus=virtio-mmio-bus.0
+    -netdev user,id=net0,hostfwd=udp::26999-:2000 -object filter-dump,id=net0,netdev=net0,file=packets.pcap
+    -device e1000,netdev=net0,bus=pcie.0,id=foo
     -kernel "${kernel_elf}")
 
 # -netdev user,id=net0,hostfwd=udp::25999-:2000 -object filter-dump,id=net0,netdev=net0,file=packets.pcap
 # -device e1000,netdev=net0,bus=pcie.0
+# -netdev user,id=net1,hostfwd=udp::26000-:2000 -object filter-dump,id=net1,netdev=net1,file=packets.pcap
+# -device e1000,netdev=net1,bus=pcie.0,id=bar,addr=2
 
 message(STATUS "Path to Disk Image: ${sd_image}")
 

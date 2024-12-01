@@ -38,11 +38,11 @@ add_subdirectory(fdutil)
 add_subdirectory(driver)
 add_subdirectory(user)
 add_subdirectory(test)
-# add_subdirectory(net)
+add_subdirectory(net)
 
 set(kernel_name kernel8)
 add_executable(${kernel_name}.elf main.c start.S)
-target_link_libraries(${kernel_name}.elf test kernelx driver common aarch64 fdutil user)
+target_link_libraries(${kernel_name}.elf test kernelx driver common aarch64 fdutil user net)
 
 # tests, do not mix up every test cases into kernel
 set(testlib test_util kernelx driver common aarch64 fdutil user)
