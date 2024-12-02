@@ -2,12 +2,13 @@
 #include <kernel/mem.h>
 #include <kernel/printk.h>
 
-void test_init() {}
+void test_init()
+{
+}
 
-extern void
-net_tx_udp(struct mbuf *m, uint32 dip, uint16 sport, uint16 dport);
+extern void net_tx_udp(struct mbuf *m, uint32 dip, uint16 sport, uint16 dport);
 
-void run_test() 
+void run_test()
 {
     struct mbuf *m = mbufalloc(MBUF_DEFAULT_HEADROOM);
     // address: 10.0.2.2
