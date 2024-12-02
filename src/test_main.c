@@ -11,6 +11,7 @@
 #include <kernel/core.h>
 #include <common/string.h>
 #include <common/debug.h>
+#include <net/net.h>
 #include <fdutil/malloc.h>
 #include <fdutil/palloc.h>
 #include <test/test_util.h>
@@ -70,6 +71,10 @@ void main()
         test_init();
 
         arch_fence();
+
+        // start networking
+        pci_init();
+        __sync_synchronize();
 
         // Set a flag indicating that the secondary CPUs can start executing.
         boot_secondary_cpus = true;

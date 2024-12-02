@@ -30,7 +30,7 @@ set(lab3cases "alloc2023;trap")
 # Lab 4: Virtio
 set(lab4cases "alloc2023;trap")
 # Lab 5: Log FS, but will test previous cases
-set(lab5cases "alloc2023;trap;proc;user")
+set(lab5cases "alloc2023;trap;proc;user;net")
 
 # enabled test cases
 # (warning: too many test cases result in too many images)
