@@ -68,6 +68,19 @@ static inline uint32 bswapl(uint32 val)
           ((val & 0xff000000UL) >> 24));
 }
 
+static inline u64 bswapp(uint64 val) {
+  u64 ret = 0;
+  ret |= ((val & 0xff) << 56);
+  ret |= ((val & 0xff00) << 40);
+  ret |= ((val & 0xff0000) << 24);
+  ret |= ((val & 0xff000000) << 8);
+  ret |= ((val & 0xff00000000) >> 8);
+  ret |= ((val & 0xff0000000000) >> 24);
+  ret |= ((val & 0xff000000000000) >> 40);
+  ret |= ((val & 0xff00000000000000) >> 56);
+  return ret;
+}
+
 // Use these macros to convert network bytes to the native byte order.
 // Note that Risc-V uses little endian while network order is big endian.
 #define ntohs bswaps
