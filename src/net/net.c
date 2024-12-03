@@ -359,3 +359,28 @@ void net_rx(struct mbuf *m)
     else
         mbuffree(m);
 }
+
+// process an arp package and then free it.
+void net_handle_arp(struct mbuf *m) 
+{
+    struct eth *ethhdr;
+    uint16 type;
+
+    ethhdr = mbufpullhdr(m, *ethhdr);
+    if (!ethhdr) {
+        mbuffree(m);
+        return;
+    }
+
+    type = ntohs(ethhdr->type);
+    if (type == ETHTYPE_ARP) {
+        // net_rx_arp will:
+        // 1. send the response;
+        // 2. release the memory.
+        net_rx_arp(m);
+    }
+    else {
+        // free the mbuffer.
+        mbuffree(m);
+    }
+}
