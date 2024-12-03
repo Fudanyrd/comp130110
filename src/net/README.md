@@ -11,14 +11,17 @@ stack.
 <ul>
     <li> An UDP/IP stack; </li>
     <li> Packet transmission; </li>
+    <li> Package receiving(polling, not DMA); </li>
 </ul>
 
 # Tests
 
 ## net_test.c
 
-Usage: start the `server.py` and then `make net-test` in the build directory.
+Usage: start the `server.py 23456` and then `make net-test` in the build directory.
 
 # Bugs
 
-None found so far.
+When receiving a packet, should use DMA/Interrupt instead of polling for 
+performances. 
+
