@@ -74,6 +74,13 @@ add_custom_target(qemu-unic-debug
     COMMAND ${aarch64_qemu} ${qemu_unic_flags} -gdb tcp::1234 -S
     DEPENDS image)
 
+add_custom_target(server
+    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/src/test/server.py 23456
+)
+add_custom_target(ping
+    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/src/test/ping.py 26999
+)
+
 add_custom_target(qemu-gdb
     COMMAND ${arrch64_qemu} ${qemu_flags} -gdb tcp::1234 -S
     DEPENDS image)
