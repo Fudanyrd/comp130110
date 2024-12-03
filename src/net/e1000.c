@@ -240,7 +240,7 @@ recv_start:
         panic("e1000_recv");
     }
     rx_ring[tail].status = 0x00;
-    rx_ring[tail].addr = (uint64)rx_mbufs[tail]->head;
+    rx_ring[tail].addr = K2P(rx_mbufs[tail]->head);
 
     regs[E1000_RDT] = tail;
 
