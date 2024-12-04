@@ -6,6 +6,7 @@
 #include <common/defines.h>
 #include <common/string.h>
 #include <common/debug.h>
+#include <common/sem.h>
 #define panic PANIC
 
 #include <kernel/mem.h>
@@ -266,6 +267,35 @@ done:
     mbuffree(m);
 }
 
+// FIXME: concurrent access introduces bug.
+struct net_txn {
+    // buffer.
+    struct mbuf *m;
+    Semaphore sema;
+};
+
+static struct net_txn txn;
+
+void net_txn_begin() 
+{
+    unalertable_wait_sem(&txn.sema);
+}
+
+void net_txn_init(void) 
+{
+    // init with 0, each time acquires it,
+    // sleep.
+    init_sem(&txn.sema, 0);
+}
+
+struct mbuf *net_txn_end(void) 
+{
+    struct mbuf *pt = txn.m;
+    // clear the received packet.
+    txn.m = NULL;
+    return pt;
+}
+
 // receives a UDP packet
 static void net_rx_udp(struct mbuf *m, uint16 len, struct ip *iphdr)
 {
@@ -298,6 +328,16 @@ static void net_rx_udp(struct mbuf *m, uint16 len, struct ip *iphdr)
 
     // FIXME: undefined function
     // sockrecvudp(m, sip, dport, sport);
+
+    // notify the reader.
+    // that a packet is here.
+    if (txn.m != NULL) {
+        // previous package is not received by user.
+        // must be freed
+        kfree_page(txn.m);
+    }
+    txn.m = m;
+    post_sem(&txn.sema);
     return;
 
 fail:

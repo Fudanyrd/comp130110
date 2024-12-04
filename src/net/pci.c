@@ -3,6 +3,7 @@
 
 #include <aarch64/mmu.h>
 #include <kernel/pt.h>
+#include <driver/interrupt.h>
 
 // see also for the memory layout of qemu's virtio:
 // https://github.com/qemu/qemu/blob/master/hw/arm/virt.c
@@ -112,6 +113,8 @@ static const int a15irqmap[] = {
 };
 #endif // _MEMLAYOUT_
 
+extern void e1000_intr(void);
+
 void pci_init()
 {
     // we'll place the e1000 registers at this address.
@@ -135,9 +138,11 @@ void pci_init()
         uint32 off = (bus << 16) | (dev << 11) | (func << 8) | (offset);
         volatile uint32 *base = ecam + off;
         uint32 id = base[0];
+        base[1] = 7;
 
         // 100e:8086 is an e1000
         if (id == 0x100e8086) {
+            // [4.1.3]
             // command and status register.
             // bit 0 : I/O access enable
             // bit 1 : memory access enable
@@ -165,4 +170,7 @@ void pci_init()
     }
 
     // not found.
+
+    // set handler.
+    set_interrupt_handler(PCIE_IRQ, e1000_intr);
 }
