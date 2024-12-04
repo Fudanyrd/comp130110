@@ -50,7 +50,9 @@ void main()
         memset(edata, 0, (usize)(end - edata));
         /* @end todo */
 
-        smp_init();
+        /* Initialize interrupt handler. */
+        init_interrupt();
+
         uart_init();
         printk_init();
         debug_init();
