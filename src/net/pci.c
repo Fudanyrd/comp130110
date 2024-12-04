@@ -158,7 +158,7 @@ void pci_init()
 
             // tell the e1000 to reveal its registers at
             // physical address 0x40000000.
-            base[4 + 0] = e1000_regs;
+            base[4 + 0] = K2P(e1000_regs);
 
             e1000_init((uint32 *)e1000_regs);
         }

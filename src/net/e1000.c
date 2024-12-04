@@ -151,6 +151,8 @@ void e1000_init(uint32 *xregs)
     regs[E1000_RDTR] = 0; // interrupt after every received packet (no timer)
     regs[E1000_RADV] = 0; // interrupt after every packet (no timer)
     u32 IMS = (1 << 7); // RXDW -- Receiver Descriptor Write Back
+    // this is recommended by the manual.
+    // u32 IMS = (1 << 7) | (1 << 3) | (1 << 6) | (1 << 2) | (1 << 4); 
     wl32(&regs[E1000_IMS], IMS);
 
     __sync_synchronize();
