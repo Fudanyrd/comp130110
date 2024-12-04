@@ -16,6 +16,9 @@
 #include <fdutil/palloc.h>
 #include <test/test_util.h>
 #include <test/test.h>
+#include <driver/gicv3.h>
+#include <driver/timer.h>
+#include <driver/virtio.h>
 
 /**
  * A main.c that is specialized for building and running tests.
@@ -59,7 +62,6 @@ void main()
 
         gicv3_init();
         gicv3_init_percpu();
-        smp_init();
 
         // boot shutdown module
         shut_init();
@@ -72,6 +74,8 @@ void main()
         init_kproc_test();
         test_init();
 
+        virtio_init();
+        smp_init();
         arch_fence();
 
         // start networking
