@@ -152,7 +152,7 @@ void e1000_init(uint32 *xregs)
     regs[E1000_RADV] = 0; // interrupt after every packet (no timer)
     u32 IMS = (1 << 7); // RXDW -- Receiver Descriptor Write Back
     // this is recommended by the manual.
-    // u32 IMS = (1 << 7) | (1 << 3) | (1 << 6) | (1 << 2) | (1 << 4); 
+    // u32 IMS = (1 << 7) | (1 << 3) | (1 << 6) | (1 << 2) | (1 << 4);
     wl32(&regs[E1000_IMS], IMS);
 
     __sync_synchronize();
@@ -258,47 +258,4 @@ void e1000_intr(void)
     regs[E1000_ICR] = 0xffffffff;
 
     e1000_recv();
-}
-
-extern void net_handle_arp(struct mbuf *m);
-
-// polling instead of DMA
-struct mbuf *e1000_poll(void) 
-{
-    regs[E1000_ICR] = 0xffffffff;
-
-    uint32 tail;
-    tail = regs[E1000_RDT];
-    tail = (tail + 1) % RX_RING_SIZE;
-
-    // check if a new packet is available
-    if (!(rx_ring[tail].status & E1000_RXD_STAT_DD)) {
-        // failed to fetch one.
-        return NULL;
-    }
-    struct mbuf *m = rx_mbufs[tail];
-    m->len = rx_ring[tail].length;
-
-    // do necessary parsing.
-    // if it is a arp packet, send the mac addr.
-    // Since it must be freed, we made a copy of 
-    // it before sending to net_rx.
-    struct mbuf *mcp = kalloc_page();
-    memcpy(mcp, m, sizeof(struct mbuf));
-    mcp->head = (char *)mcp->buf + (u64)m->head - (u64)m->buf;
-    net_handle_arp(m);
-    m = NULL;
-
-    // update the value of tail.
-    rx_mbufs[tail] = mbufalloc(0);
-    if (!rx_mbufs[tail]) {
-        panic("e1000_recv");
-    }
-    rx_ring[tail].status = 0x00;
-    rx_ring[tail].addr = K2P(rx_mbufs[tail]->head);
-
-    // update the E1000_RDT register to be the index 
-    // of the last ring descriptor processed. 
-    regs[E1000_RDT] = tail;
-    return mcp;
 }

@@ -17,10 +17,10 @@
 
 extern void net_tx_udp(struct mbuf *m, uint32 dip, uint16 sport, uint16 dport);
 extern void e1000_intr(void);
-extern struct mbuf *e1000_poll(void) ;
 static void receive_and_print(void);
 
-static void rt_entry() {
+static void rt_entry()
+{
     struct mbuf *m = mbufalloc(MBUF_DEFAULT_HEADROOM);
     // address: 10.0.2.2
     u32 dst = (10 << 24) | (0 << 16) | (2 << 8) | 2;
@@ -40,12 +40,14 @@ static void rt_entry() {
     }
 }
 
-static void chd_entry(u64 arg __attribute__((unused))) {
+static void chd_entry(u64 arg __attribute__((unused)))
+{
     for (;;) {
     }
 }
 
-static void timer_irq_handler() {
+static void timer_irq_handler()
+{
     yield();
 }
 
@@ -63,32 +65,12 @@ void test_init()
     ret = _arch_enable_trap();
 }
 
-static void receive_and_print(void) {
+static void receive_and_print(void)
+{
     struct mbuf *m;
-    /*
-    while ((m = e1000_poll()) == NULL) {
-        // continue;
-        __sync_synchronize();
-    }
-
-    // receive a packet!
-    struct eth *ethhdr;
-    ethhdr = mbufpullhdr(m, *ethhdr);
-    u16 type = htons(ethhdr->type);
-
-    if (type == ETHTYPE_ARP) {
-        printk("A\n");
-    } else {
-        if (type == ETHTYPE_IP) {
-            // an ip packet
-            mbufpull(m, sizeof(struct ip));
-            mbufpull(m, sizeof(struct udp));
-            printk("D\n");
-        }
-    }*/
 
     net_txn_begin();
-    // wakeup by irq handler, 
+    // wakeup by irq handler,
     // the data should be ready!
     m = net_txn_end();
     if (m != NULL) {
@@ -104,5 +86,6 @@ void run_test()
     yield();
     yield();
     yield();
-    for (;;) {}
+    for (;;) {
+    }
 }

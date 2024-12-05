@@ -276,19 +276,19 @@ struct net_txn {
 
 static struct net_txn txn;
 
-void net_txn_begin() 
+void net_txn_begin()
 {
     unalertable_wait_sem(&txn.sema);
 }
 
-void net_txn_init(void) 
+void net_txn_init(void)
 {
     // init with 0, each time acquires it,
     // sleep.
     init_sem(&txn.sema, 0);
 }
 
-struct mbuf *net_txn_end(void) 
+struct mbuf *net_txn_end(void)
 {
     struct mbuf *pt = txn.m;
     // clear the received packet.
@@ -398,29 +398,4 @@ void net_rx(struct mbuf *m)
         net_rx_arp(m);
     else
         mbuffree(m);
-}
-
-// process an arp package and then free it.
-void net_handle_arp(struct mbuf *m) 
-{
-    struct eth *ethhdr;
-    uint16 type;
-
-    ethhdr = mbufpullhdr(m, *ethhdr);
-    if (!ethhdr) {
-        mbuffree(m);
-        return;
-    }
-
-    type = ntohs(ethhdr->type);
-    if (type == ETHTYPE_ARP) {
-        // net_rx_arp will:
-        // 1. send the response;
-        // 2. release the memory.
-        net_rx_arp(m);
-    }
-    else {
-        // free the mbuffer.
-        mbuffree(m);
-    }
 }
