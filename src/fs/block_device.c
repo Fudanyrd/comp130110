@@ -1,3 +1,4 @@
+#include <common/string.h>
 #include <driver/virtio.h>
 #include <fs/block_device.h>
 
@@ -48,6 +49,7 @@ void init_block_device()
 {
     block_device.read = sd_read;
     block_device.write = sd_write;
+    sd_read(0, (u8 *)sblock_data);
 }
 
 const SuperBlock *get_super_block()
