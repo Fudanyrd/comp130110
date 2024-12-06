@@ -7,6 +7,8 @@
 #include <kernel/sched.h>
 #include <test/test.h>
 #include <fdutil/stddef.h>
+#include <fs/file1206.h>
+#include <kernel/exec1207.h>
 
 volatile bool panic_flag;
 
@@ -29,15 +31,23 @@ NO_RETURN void idle_entry()
 NO_RETURN void kernel_entry()
 {
     printk("Hello world! (Core %lld)\n", cpuid());
-    init_mbr();
-    // proc_test();
-    // vm_test();
-    // user_proc_test();
-    io_test();
 
-    /* LAB 4 TODO 3 BEGIN */
+    // before doing anything else, 
+    // initialize the file system first.
+    // the fs is initialized here because it need 
+    // some other proc to take over.
+    fs_init();
 
-    /* LAB 4 TODO 3 END */
+    ASSERT(inodes.root->valid);
+    thisproc()->cwd = inodes.share(inodes.root);
+
+    char *argv[] = {
+        "/init", NULL
+    };
+    exec("/init", argv);
+
+    // TODO
+    // run init program.
 
     while (1)
         yield();
@@ -47,7 +57,7 @@ NO_INLINE NO_RETURN void _panic(const char *file, int line)
 {
     printk("=====%s:%d PANIC%lld!=====\n", file, line, cpuid());
     panic_flag = true;
-    set_cpu_off();
+    // set_cpu_off();
     for (int i = 0; i < NCPU; i++) {
         if (cpus[i].online)
             i--;

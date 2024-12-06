@@ -6,7 +6,6 @@
 #ifndef NCPU
 #define NCPU 4
 #endif // Add an unfortunate patch. Hmm??@!
-#include "proc.h"
 
 struct sched {
     // TODO: customize your sched info
