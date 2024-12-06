@@ -9,6 +9,7 @@
 
 #include <net/net.h>
 #include <net/e1000.h>
+#include <net/socket.h>
 #include <kernel/mem.h>
 #include <kernel/cpu.h>
 #include <kernel/printk.h>
@@ -17,26 +18,23 @@
 
 extern void net_tx_udp(struct mbuf *m, uint32 dip, uint16 sport, uint16 dport);
 extern void e1000_intr(void);
-static void receive_and_print(void);
 
 static void rt_entry()
 {
-    struct mbuf *m = mbufalloc(MBUF_DEFAULT_HEADROOM);
     // address: 10.0.2.2
     u32 dst = (10 << 24) | (0 << 16) | (2 << 8) | 2;
 
     // initialize semaphore, lock, etc.
-    net_txn_init();
+    sock_init();
+    Socket *sock = sock_open(dst, 2000, 23456);
 
-    static const char *message = "Hello network!\n";
-    char *mb = mbufput(m, 16);
-    for (int i = 0; i < 16; i++) {
-        mb[i] = message[i];
-    }
-    net_tx_udp(m, dst, 2000, 23456);
+    char *message = "Hello network!\n";
+    static char buf[256];
+    sock_write(sock, message, 16);
 
     for (;;) {
-        receive_and_print();
+        sock_read(sock, buf, sizeof(buf));
+        printk("%s\n", (char *)buf);
     }
 }
 
@@ -63,22 +61,6 @@ void test_init()
     set_cpu_on();
     bool ret __attribute__((unused));
     ret = _arch_enable_trap();
-}
-
-static void receive_and_print(void)
-{
-    struct mbuf *m;
-
-    net_txn_begin();
-    // wakeup by irq handler,
-    // the data should be ready!
-    m = net_txn_end();
-    if (m != NULL) {
-        printk("%s\n", m->head);
-    }
-
-    // allocated by kalloc_page.
-    kfree_page(m);
 }
 
 void run_test()
