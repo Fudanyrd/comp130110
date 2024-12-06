@@ -10,6 +10,7 @@
 #define panic PANIC
 
 #include <kernel/mem.h>
+#include "socket.h"
 #include "net.h"
 
 static uint32 local_ip =
@@ -267,44 +268,15 @@ done:
     mbuffree(m);
 }
 
-// FIXME: concurrent access introduces bug.
-struct net_txn {
-    // buffer.
-    struct mbuf *m;
-    Semaphore sema;
-};
-
-static struct net_txn txn;
-
-void net_txn_begin()
-{
-    unalertable_wait_sem(&txn.sema);
-}
-
-void net_txn_init(void)
-{
-    // init with 0, each time acquires it,
-    // sleep.
-    init_sem(&txn.sema, 0);
-}
-
-struct mbuf *net_txn_end(void)
-{
-    struct mbuf *pt = txn.m;
-    // clear the received packet.
-    txn.m = NULL;
-    return pt;
-}
-
 // receives a UDP packet
 static void net_rx_udp(struct mbuf *m, uint16 len, struct ip *iphdr)
 {
     struct udp *udphdr;
     // FIXME:
     // unused variables
-    uint32 sip __attribute__((unused));
-    uint16 sport __attribute__((unused));
-    u16 dport __attribute__((unused));
+    uint32 sip;
+    uint16 sport;
+    u16 dport;
 
     udphdr = mbufpullhdr(m, *udphdr);
     if (!udphdr)
@@ -328,16 +300,7 @@ static void net_rx_udp(struct mbuf *m, uint16 len, struct ip *iphdr)
 
     // FIXME: undefined function
     // sockrecvudp(m, sip, dport, sport);
-
-    // notify the reader.
-    // that a packet is here.
-    if (txn.m != NULL) {
-        // previous package is not received by user.
-        // must be freed
-        kfree_page(txn.m);
-    }
-    txn.m = m;
-    post_sem(&txn.sema);
+    sock_recv(m, sip, dport, sport);
     return;
 
 fail:

@@ -188,12 +188,4 @@ struct dns_data {
 
 extern void pci_init(void);
 
-extern void net_txn_init(void);
-extern void net_txn_begin(void);
-
-/**
- * @return an packet allocated via palloc_page().
- */
-extern struct mbuf *net_txn_end(void);
-
 #endif // NET_H
