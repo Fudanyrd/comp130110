@@ -33,6 +33,7 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} \
 
 add_subdirectory(aarch64)
 add_subdirectory(common)
+add_subdirectory(fs)
 add_subdirectory(kernel)
 add_subdirectory(fdutil)
 add_subdirectory(driver)
@@ -42,10 +43,10 @@ add_subdirectory(net)
 
 set(kernel_name kernel8)
 add_executable(${kernel_name}.elf main.c start.S)
-target_link_libraries(${kernel_name}.elf test kernelx driver common aarch64 fdutil user net)
+target_link_libraries(${kernel_name}.elf test kernelx driver common aarch64 fdutil user net fs)
 
 # tests, do not mix up every test cases into kernel
-set(testlib test_util kernelx driver common aarch64 fdutil user net)
+set(testlib test_util kernelx driver common aarch64 fdutil user net fs)
 set(kmain test_main.c start.S)
 
 foreach(tcase IN LISTS tcases)
