@@ -54,14 +54,49 @@ extern int exec(const char *path, char **argv)
     *entr = K2P(stkpg) | PTE_USER_DATA;
 
     // setup a user context for trap_return.
-    UserContext *ctx = (UserContext *)(stkpg + PAGE_SIZE - sizeof(UserContext));
+    UserContext *ctx = proc->ucontext;
     memset(ctx, 0, sizeof(*ctx));
     ctx->elr = ehdr->e_entry;
     // see aarch64/trap.S for why set x0 to this val.
-    ctx->sp = ctx->x0 = STACK_START;
     // ctx->spsr = 0;
 
     // FIXME: set up argc, argv in user stack
+    char *sp = (char *)stkpg + PAGE_SIZE;
+    u64 cur = STACK_START; // cur advances in the same speed as sp.
+    u64 addrs[32];
+    int i;
+    for (i = 0; argv[i] != NULL; i++) {
+        // put these strings on stack.
+        usize len = strlen(argv[i]);
+        sp -= (len + 1);
+        cur -= (len + 1);
+        addrs[i] = cur;
+        // strcpy
+        for (usize k = 0; k < len; k++) {
+            sp[k] = argv[i][k];
+        }
+        sp[len] = 0;
+    }
+    const u64 narg = (u64)i;
+    // align to 16 byte for storing pointers.
+    sp -= (u64)sp % 0x10;
+    if (narg % 2 != 0) {
+        sp -= 0x8;
+    }
+    // push NULL.
+    sp -= 0x8;
+    *(char **)sp = NULL;
+    // push argv, argc. 
+    for (i --; i >= 0; i--) {
+        sp -= 0x8;
+        *(u64 *)sp = addrs[i];
+    }
+    sp -= 8;
+    *(u64 *)sp = narg;
+    // must align to 16 bytes.
+    ASSERT((u64) sp % 0x10 == 0);
+    // set x0, sp to the current pointer.
+    ctx->sp = ctx->x0 = STACK_START - PAGE_SIZE + (sp - (char *)stkpg);
 
     // free allocated resources.
     kfree(ehdr);
@@ -71,11 +106,8 @@ extern int exec(const char *path, char **argv)
     // install the page table.
     attach_pgdir(pd);
 
-    asm volatile(
-        "mov sp, %0\n\t"
-        "bl trap_return\n\t"
-        : : "r"(ctx)
-    );
+    // set ctx so as to jump here.
+    proc->ucontext = ctx;
     return 0;
 
 exec_bad:

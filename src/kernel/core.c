@@ -39,12 +39,28 @@ NO_RETURN void kernel_entry()
     fs_init();
 
     ASSERT(inodes.root->valid);
+
+    // init proc runs at root dir.
     thisproc()->cwd = inodes.share(inodes.root);
+    // setup a usercontext on stack.
+    UserContext ctx;
+    thisproc()->ucontext = &ctx;
 
     char *argv[] = {
-        "/init", NULL
+        "/init", "foo", "bar", "baz", NULL
     };
     exec("/init", argv);
+    
+    // the user space is ready, now jump to the 
+    // user space via trap_ret. This should be 
+    // the only case where trap_ret happens without a 
+    // trap_entry.
+    asm volatile(
+        "mov sp, %0\n\t"
+        "bl trap_return"
+      :
+      : "r"(&ctx)
+    );
 
     // TODO
     // run init program.
