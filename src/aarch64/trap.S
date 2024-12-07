@@ -5,7 +5,9 @@
 .global trap_entry
 trap_entry:
 // TODO: save UserContext
+    // make space for usercontext
     sub sp, sp, #272
+    // store x0-x30
     str x0, [sp,   #0]
     str x1, [sp,   #8]
     str x2, [sp,  #16]
@@ -37,11 +39,15 @@ trap_entry:
     str x28, [sp, #224]
     str lr,  [sp, #232]
     str fp,  [sp, #240]
+    // store sp
     mov x0, sp
+    add x0, x0, #272
     str x0,  [sp, #248]
+    // store spsr, elr
     mrs x0, spsr_el1
     str x0, [sp, #256]
     mrs x0, elr_el1
+    // store x0
     str x0, [sp, #264]
     mov x0, sp
 
@@ -50,8 +56,11 @@ trap_entry:
 .global trap_return
 trap_return:
 // TODO: restore UserContext
+    // FIXME: unnecessary load should be removed
     ldr x0, [sp,   #0]
     ldr x1, [sp,   #8]
+
+    // recover x2-x30, including fp, lr
     ldr x2, [sp,  #16]
     ldr x3, [sp,  #24]
     ldr x4, [sp,  #32]
@@ -81,11 +90,23 @@ trap_return:
     ldr x28, [sp, #224]
     ldr lr,  [sp, #232]
     ldr fp,  [sp, #240]
+
+    // recovering spsr and elr
     ldr x0,  [sp, #256]
     msr spsr_el1, x0
     ldr x0,  [sp, #264]
     msr elr_el1, x0
-    ldr x0,  [sp, #0]
-    add sp, sp, #272
 
+    // recover x0, x1, and sp.
+    mov x0, sp
+    ldr x1, [x0, #248]
+    mov sp, x1  // sp recoverd!
+    ldr x1, [x0, #8] // x1 recovered!
+    ldr x0, [x0, #0] // x0 recovered!
+
+    // eret somewhat cleared the value of 
+    // sp. 
+    // as a partial fix, we store the initial
+    // sp in x0, and the first instruction
+    // should be "mov sp, x0" for user program.
     eret
