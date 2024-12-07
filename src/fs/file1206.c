@@ -233,3 +233,41 @@ isize fread(File *fobj, char *buf, u64 count)
 
     return ret;
 }
+
+isize fseek(File *fobj, isize bias, int flag)
+{
+    if (fobj == NULL || fobj->type != FD_INODE) {
+        return -1;
+    }
+    if (!fobj->ino->valid) {
+        // load from disk
+        inodes.sync(NULL, fobj->ino, false);
+    }
+
+    isize ret;
+    switch (flag) {
+    case (S_SET): {
+        ret = 0 + bias;
+        break;
+    }
+    case (S_CUR): {
+        ret  = (isize)fobj->off + bias;
+        break;
+    }
+    case (S_END): {
+        ret = (isize)fobj->ino->entry.num_bytes + bias;
+        break;
+    }
+    default: {
+        // invalid parameter.
+        ret = -1;
+    }
+    }
+
+    if (ret < 0) {
+        return -1;
+    } 
+
+    fobj->off = ret;
+    return ret;
+}

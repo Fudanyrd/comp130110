@@ -63,5 +63,15 @@ int sys_chdir(const char *path);
 File *fopen(const char *path, int flags);
 void fclose(File *fobj);
 
+/** Returns the position after the seek. -1 if error */
+#define S_SET 0
+#define S_CUR 1
+#define S_END 2
+
+/** Seek a file.
+ * @return the offset after the seek. -1 if failure. 
+ */
+isize fseek(File *fobj, isize bias, int flag);
+
 /** Returns num bytes read from file */
 isize fread(File *fobj, char *buf, u64 count);
