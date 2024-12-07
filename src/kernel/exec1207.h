@@ -6,6 +6,29 @@
 #include <kernel/proc.h>
 #include <kernel/sched.h>
 
+// clang-format off
+/** My program's address space layout
+ * +----------+ <- 0xc0000000
+ * |  stack   |
+ * +----------+ <- 0xc0000000 - 16KB
+ * |          |
+ * |  empty   |
+ * |          |
+ * +----------+
+ * |   .bss   |
+ * +----------+ < determined by elf
+ * |  .data   |
+ * +----------+
+ * |  .text   |
+ * +----------+ < determined by elf
+ */
+// clang-format on
+
+/** The initial stack position.
+ * NOTE: the stack grows to low address!
+ */
+#define STACK_START 0xc0000000
+
 /* Type for a 16-bit quantity.  */
 typedef u16 Elf32_Half;
 typedef u16 Elf64_Half;
@@ -55,6 +78,36 @@ typedef struct {
   Elf64_Half	e_shnum;		/* Section header table entry count */
   Elf64_Half	e_shstrndx;		/* Section header string table index */
 } Elf64_Ehdr;
+
+#define	PT_NULL		0		/* Program header table entry unused */
+#define PT_LOAD		1		/* Loadable program segment */
+#define PT_DYNAMIC	2		/* Dynamic linking information */
+#define PT_INTERP	3		/* Program interpreter */
+#define PT_NOTE		4		/* Auxiliary information */
+#define PT_SHLIB	5		/* Reserved */
+#define PT_PHDR		6		/* Entry for header table itself */
+#define PT_TLS		7		/* Thread-local storage segment */
+#define	PT_NUM		8		/* Number of defined types */
+
+/* Legal values for p_flags (segment flags).  */
+
+#define PF_X		(1 << 0)	/* Segment is executable */
+#define PF_W		(1 << 1)	/* Segment is writable */
+#define PF_R		(1 << 2)	/* Segment is readable */
+#define PF_MASKOS	0x0ff00000	/* OS-specific */
+#define PF_MASKPROC	0xf0000000	/* Processor-specific */
+
+typedef struct
+{
+  Elf64_Word	p_type;			/* Segment type */
+  Elf64_Word	p_flags;		/* Segment flags */
+  Elf64_Off	p_offset;		/* Segment file offset */
+  Elf64_Addr	p_vaddr;		/* Segment virtual address */
+  Elf64_Addr	p_paddr;		/* Segment physical address */
+  Elf64_Xword	p_filesz;		/* Segment size in file */
+  Elf64_Xword	p_memsz;		/* Segment size in memory */
+  Elf64_Xword	p_align;		/* Segment alignment */
+} Elf64_Phdr;
 
 extern int exec(const char *path, char **argv);
 
