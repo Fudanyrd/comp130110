@@ -219,6 +219,24 @@ void fclose(File *fobj)
     }
 }
 
+static inline isize file_read(File *fobj, char *buf, u64 count)
+{
+    Inode *ino = fobj->ino;
+
+    if (ino->entry.type != INODE_REGULAR) {
+        // not a valid file
+        return -1;
+    }
+    if (ino->entry.num_bytes <= fobj->off) {
+        // read beyond file, fail
+        return 0;
+    }
+
+    isize ret = inodes.read(ino, (u8 *)buf, fobj->off, count);
+    fobj->off += ret;
+    return ret;
+}
+
 isize fread(File *fobj, char *buf, u64 count)
 {
     if (!fobj->readable) {
@@ -238,7 +256,7 @@ isize fread(File *fobj, char *buf, u64 count)
         break;
     }
     case (FD_INODE): {
-        ret = inodes.read(fobj->ino, (u8 *)buf, fobj->off, count);
+        ret = file_read(fobj, buf, count);
         break;
     }
     }
@@ -599,4 +617,22 @@ int sys_close(int fd)
     // clear in the opent able
     proc->ofile.ofile[fd] = NULL;
     return 0;
+}
+
+isize sys_read(int fd, char *buf, usize count)
+{
+    ASSERT(IS_KERNEL_ADDR(buf));
+    if (fd < 0 || fd >= 16) {
+        // invalid fd 
+        return -1;
+    }
+
+    Proc *proc = thisproc();
+    File *fobj = proc->ofile.ofile[fd];
+    if (fobj == NULL) {
+        // invalid fd, fail
+        return -1;
+    }
+
+    return fread(fobj, buf, count);
 }

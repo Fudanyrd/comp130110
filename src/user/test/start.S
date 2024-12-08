@@ -32,3 +32,9 @@ sys_readdir:
     mov w8, #4
     svc #0
     ret
+
+.globl sys_read 
+sys_read:
+    mov w8, #5
+    svc #0
+    ret

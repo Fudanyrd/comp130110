@@ -76,7 +76,7 @@ int sys_open(const char *path, int flags);
 
 int sys_close(int fd);
 
-int sys_read(int fd, char *buf, usize count);
+isize sys_read(int fd, char *buf, usize count);
 int sys_write(int fd, char *buf, usize count);
 
 /** Read an dir entry into user buffer. */

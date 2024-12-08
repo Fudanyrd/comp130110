@@ -22,6 +22,10 @@ cat /dev/zero | head -c 16777216 > sd.img
 ftmp=/tmp/mkfs.txt
 echo "Creatiing temp file" $ftmp
 echo "w /init init" > $ftmp
+echo "m /home 0" >> $ftmp
+echo "m /usr 0" >> $ftmp
+echo "w /home/README.txt README.txt" >> $ftmp
+cat $ftmp
 ./copyin < $ftmp
 # hexdump -C sd.img | less
 rm $ftmp
