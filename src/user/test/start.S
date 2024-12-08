@@ -1,7 +1,6 @@
 .globl main
 .globl _start
 _start:
-    mov sp, x0
     ldr x0, [sp, #0]
     mov x1, sp 
     add x1, x1, #8

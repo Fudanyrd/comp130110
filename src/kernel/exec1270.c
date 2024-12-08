@@ -4,8 +4,8 @@
 #include <kernel/pt.h>
 #include <common/string.h>
 
-// see aarch64/trap.S.
-extern void fork_return(u64 sp, u64 elr, u64 spsr);
+// see aarch64/forkret.S.
+extern void fork_return(uintptr_t sp, uintptr_t entry);
 
 /** Install the section into page table.
  * @return 0 on success. 
@@ -56,7 +56,6 @@ extern int exec(const char *path, char **argv)
     // setup a user context for trap_return.
     UserContext *ctx = proc->ucontext;
     memset(ctx, 0, sizeof(*ctx));
-    ctx->elr = ehdr->e_entry;
     // see aarch64/trap.S for why set x0 to this val.
     // ctx->spsr = 0;
 
@@ -97,6 +96,9 @@ extern int exec(const char *path, char **argv)
     ASSERT((u64) sp % 0x10 == 0);
     // set x0, sp to the current pointer.
     ctx->sp = ctx->x0 = STACK_START - PAGE_SIZE + (sp - (char *)stkpg);
+    // x1 is the value of return addr.
+    ctx->x1 = ehdr->e_entry;
+    ctx->elr = (u64)fork_return;
 
     // free allocated resources.
     kfree(ehdr);
