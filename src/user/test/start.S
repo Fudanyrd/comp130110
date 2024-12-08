@@ -38,3 +38,9 @@ sys_read:
     mov w8, #5
     svc #0
     ret
+
+.globl sys_chdir
+sys_chdir:
+    mov w8, #6
+    svc #0
+    ret

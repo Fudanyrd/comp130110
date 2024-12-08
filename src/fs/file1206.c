@@ -514,6 +514,7 @@ int sys_chdir(const char *path)
         // not a directory, fail
         // proc->cwd does not change.
         kfree(buf);
+        inodes.put(NULL, dir);
         return -1;
     }
 

@@ -18,6 +18,7 @@ void syscall_open(UserContext *ctx);
 void syscall_close(UserContext *ctx);
 void syscall_readdir(UserContext *ctx);
 void syscall_read(UserContext *ctx);
+void syscall_chdir(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -28,7 +29,8 @@ void *syscall_table[NR_SYSCALL] = {
     [3] = (void *)syscall_close,
     [4] = (void *)syscall_readdir,
     [5] = (void *)syscall_read,
-    [6 ... NR_SYSCALL - 1] = NULL,
+    [6] = (void *)syscall_chdir,
+    [7 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -239,6 +241,26 @@ void syscall_read(UserContext *ctx)
         copyout(&thisproc()->pgdir, buf, ctx->x1, ret) != 0) {
         ret = -1;
     }
+    kfree_page(buf);
+    ctx->x0 = ret;
+}
+
+void syscall_chdir(UserContext *ctx)
+{
+    // note:
+    // int sys_chdir(const char *path);
+    char *buf = kalloc_page();
+    struct pgdir *pd = &thisproc()->pgdir;
+    int ret;
+    if (buf == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+    if (copyinstr(pd, buf, ctx->x0) != 0) {
+        kfree_page(buf);
+        ret = -1;
+    }
+    ret = sys_chdir(buf);
     kfree_page(buf);
     ctx->x0 = ret;
 }
