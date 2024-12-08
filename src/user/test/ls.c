@@ -31,6 +31,7 @@ typedef struct dirent {
 extern void sys_print(const char *s, unsigned long len);
 extern int sys_open(const char *s, int flags);
 extern int sys_close(int fd);
+extern int sys_readdir(int fd, DirEntry *buf);
 static void list(const char *path);
 
 int main(int argc, char **argv) 
@@ -46,8 +47,13 @@ static void list(const char *path)
     int fd = sys_open(path, O_READ);
     if (fd < 0) {
         // fail
-        sys_print("FAIL", 4);
+        sys_print("open FAIL", 9);
         return;
+    }
+
+    static DirEntry entry;
+    while (sys_readdir(fd, &entry) == 0) {
+        sys_print(entry.name, FILE_NAME_MAX_LENGTH);
     }
 
     if (sys_close(fd) < 0) {

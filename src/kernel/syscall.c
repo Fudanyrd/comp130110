@@ -16,6 +16,7 @@ typedef void (*syscall_fn)(UserContext *);
 void syscall_print(UserContext *ctx);
 void syscall_open(UserContext *ctx);
 void syscall_close(UserContext *ctx);
+void syscall_readdir(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -24,7 +25,8 @@ void *syscall_table[NR_SYSCALL] = {
     [1] = (void *)syscall_print,
     [2] = (void *)syscall_open,
     [3] = (void *)syscall_close,
-    [4 ... NR_SYSCALL - 1] = NULL,
+    [4] = (void *)syscall_readdir,
+    [5 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -204,6 +206,21 @@ void syscall_close(UserContext *ctx)
     // note:
     // int sys_close(int fd);
     ctx->x0 = sys_close((int)ctx->x0);
+}
+
+void syscall_readdir(UserContext *ctx)
+{
+    // note:
+    // int sys_readdir(int fd, char *buf);
+    DirEntry *dir = kalloc(sizeof(DirEntry));
+    int ret = sys_readdir((int)ctx->x0, (char *)dir);
+    u64 uva = ctx->x1;
+    if (ret >= 0 && 
+        copyout(&thisproc()->pgdir, dir, uva, sizeof(DirEntry)) != 0) {
+        ret = -1;
+    }
+    kfree(dir);
+    ctx->x0 = (int)ret;
 }
 
 #pragma GCC diagnostic pop

@@ -26,3 +26,9 @@ sys_close:
     mov w8, #3
     svc #0
     ret
+
+.globl sys_readdir
+sys_readdir:
+    mov w8, #4
+    svc #0
+    ret

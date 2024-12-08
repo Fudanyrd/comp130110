@@ -532,14 +532,26 @@ int sys_readdir(int fd, char *buf)
         return -1;
     }
 
-    if (inodes.read(ino, (u8 *)buf, fobj->off, 
-                    sizeof(DirEntry)) != sizeof(DirEntry)) {
-        // fail
+    ASSERT(fobj->off % sizeof(DirEntry) == 0);
+    ASSERT(ino->entry.num_bytes % sizeof(DirEntry) == 0);
+    if (fobj->off >= ino->entry.num_bytes) {
+        // read beyond dir.
         return -1;
     }
-    ASSERT(fobj->off % sizeof(DirEntry) == 0);
-    fobj->off += sizeof(DirEntry);
-    return 0;
+
+    bool success = false;
+    while (fobj->off < ino->entry.num_bytes) {
+        inodes.read(ino, (u8 *)buf, fobj->off, sizeof(DirEntry));
+        fobj->off += sizeof(DirEntry);
+        DirEntry *entr = (DirEntry *)buf;
+        if (entr->inode_no != 0) {
+            success = true;
+            break;
+        }
+    }    
+
+    // seek reaches end.
+    return success ? 0 : (-1);
 }
 
 int sys_open(const char *path, int flags)
