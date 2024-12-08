@@ -132,11 +132,37 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
 
     // protection
     PTEntry prot = PTE_USER_DATA;
-    void *start = addr_round_down(ph->p_vaddr, ph->p_align); 
-    start = addr_round_down((u64)start, PAGE_SIZE);
+    void *start = addr_round_down(ph->p_vaddr, PAGE_SIZE); 
     void *end = addr_round_up(ph->p_vaddr + ph->p_memsz, PAGE_SIZE);
     isize offset = ph->p_offset;
     isize nread = ph->p_filesz;
+
+    // load the first page, must read from file.
+    if (start < end && nread > 0) {
+        PTEntry *entr = get_pte(pd, (u64)start, true);
+        if (entr == NULL) {
+            goto install_bad;
+        }
+
+        // set the page to 0.
+        void *pg = kalloc_page();
+        memset(pg, 0, PAGE_SIZE);
+
+        // read from file
+        ASSERT(fseek(exe, offset, S_SET) == offset);
+        // tmp = min(4096 - vaddr % 4096, nread);
+        isize tmp = PAGE_SIZE - ph->p_vaddr % PAGE_SIZE;
+        tmp = tmp > nread ? nread : tmp;
+        fread(exe, (char *)pg + ph->p_vaddr % PAGE_SIZE, tmp);
+
+        // install the page
+        *entr = K2P(pg) | PTE_USER_DATA;
+
+        // advance.
+        start += PAGE_SIZE;
+        offset += tmp;
+        nread -= tmp;
+    }
 
     for (; start < end; start += PAGE_SIZE) {
         // map the page
