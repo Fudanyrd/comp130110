@@ -116,6 +116,7 @@ typedef struct Proc {
     KernelContext kcontext;
     UserContext *ucontext;
     Inode *cwd;  // current working directory
+    struct oftable ofile;
 } Proc;
 
 void init_kproc();

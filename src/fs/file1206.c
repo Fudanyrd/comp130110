@@ -3,6 +3,7 @@
 #include <common/string.h>
 #include <kernel/proc.h>
 #include <kernel/sched.h>
+#include <kernel/syscall.h>
 
 /** 
  * WARNING:
@@ -59,6 +60,8 @@ static Inode *walk(Inode *start, const char *path, char *buf)
     Inode *next;
     if (nextno == 0) {
         // fail to find dir.
+        // release start, and return to caller.
+        inodes.put(NULL, start);
         return NULL;
     } else {
         next = inodes.get(nextno);
@@ -118,6 +121,7 @@ File *fopen(const char *path, int flags)
     // check path name
     if (*path == 0) {
         // empty path name
+        kfree(buf);
         return NULL;
     }
 
@@ -125,6 +129,7 @@ File *fopen(const char *path, int flags)
     struct file *fobj = kalloc(sizeof(struct file));
     if (fobj == NULL) {
         // fail
+        kfree(buf);
         return NULL;
     }
     fobj->ref = 1;
@@ -146,6 +151,7 @@ File *fopen(const char *path, int flags)
         fobj->readable = (flags & F_READ) != 0;
         fobj->writable = (flags & F_WRITE) != 0;
         inodes.put(NULL, start);
+        kfree(buf);
         return fobj;
     }
 
@@ -153,6 +159,7 @@ File *fopen(const char *path, int flags)
     Inode *ino = walk(start, path, buf);
     if (ino == NULL) {
         // fail
+        kfree(buf);
         return NULL;
     }
 
@@ -163,6 +170,7 @@ File *fopen(const char *path, int flags)
         if ((flags & F_CREATE) == 0) {
             // fail
             inodes.put(NULL, ino);
+            kfree(buf);
             return NULL;
         } 
 
@@ -204,7 +212,11 @@ void fclose(File *fobj)
     }
     }
 
-    kfree(fobj);
+    ASSERT(fobj->ref > 0);
+    fobj->ref--;
+    if (fobj->ref == 0) {
+        kfree(fobj);
+    }
 }
 
 isize fread(File *fobj, char *buf, u64 count)
@@ -270,4 +282,309 @@ isize fseek(File *fobj, isize bias, int flag)
 
     fobj->off = ret;
     return ret;
+}
+
+/** Write to an inode-based file. */
+static isize fino_write(File *fobj, char *addr, isize n)
+{    
+    Inode *ino = fobj->ino;
+    OpContext *ctx = kalloc(sizeof(OpContext));
+    if (ctx == NULL) {
+        // bad
+        return -1;
+    }
+    bcache.begin_op(ctx);
+
+    if (!ino->valid) {
+        inodes.sync(ctx, ino, false);
+    }
+    if (ino->entry.type != INODE_REGULAR) {
+        // not a regular file
+        goto fiw_bad;
+    }
+
+    // we allows write beyond the file, 
+    // so do not check offset.
+    usize incr = inodes.write(ctx, ino, (u8 *)addr, fobj->off, (usize)n);
+    // update the offset
+    fobj->off += incr;
+
+    bcache.end_op(ctx);
+    kfree(ctx);
+    return incr;
+
+fiw_bad:
+    bcache.end_op(ctx);
+    kfree(ctx);
+    return -1;
+}
+
+isize fwrite(File *fobj, char* addr, isize n)
+{
+    isize ret;
+    switch (fobj->type) {
+    case (FD_INODE): {
+        ret = fino_write(fobj, addr, n);
+        break;
+    }
+    case (FD_PIPE): {
+        ret = pipe_write(fobj->pipe, addr, n);
+        break;
+    }
+    default : {
+        // case (FD_NONE):
+        ret = -1;
+        break;
+    }
+    }
+    return ret;
+}
+
+// create directory.
+int sys_mkdir(const char *path)
+{
+    ASSERT(IS_KERNEL_ADDR(path));
+
+    Proc *proc = thisproc();
+    char *buf = kalloc(256);
+    ASSERT(proc->cwd->valid);
+    ASSERT(proc->cwd != NULL);
+    if (buf == NULL) {
+        kfree(buf);
+        return -1;
+    }
+
+    // check path name
+    if (*path == 0) {
+        // empty path name, fail
+        kfree(buf);
+        return -1;
+    }   
+
+    // walk from start
+    Inode *start = *path == '/' ? inodes.share(inodes.root) // absolute
+                                  :
+                                  inodes.share(proc->cwd); // relative
+    while (*path == '/') {
+        path++;
+    }
+    
+    if (*path == 0) {
+        // root dir exists
+        kfree(buf);
+        return -1;
+    }
+
+    // start walking
+    Inode *ino = walk(start, path, buf);
+    ASSERT(ino->valid);
+    ASSERT(*buf != '/');
+    if (ino == NULL) {
+        // fail
+        kfree(buf);
+        return -1;
+    }
+
+    // lookup in the dir first.
+    usize no = inodes.lookup(ino, buf, NULL);
+    if (no != 0) {
+        // fail: already exists
+        inodes.put(NULL, ino);
+        kfree(buf);
+        return -1;
+    }
+
+    // create a ctx and start op
+    OpContext *ctx = kalloc(sizeof(ctx));
+    bcache.begin_op(ctx);
+    if (ctx == NULL) {
+        inodes.put(NULL, ino);
+        kfree(buf);
+        return -1;
+    }
+
+    // create a directory.
+    u64 dirno = inodes.alloc(ctx, INODE_DIRECTORY);
+    Inode *dir = inodes.get(dirno);
+    inodes.sync(ctx, dir, false);
+    memset((void *)&dir->entry, 0, sizeof(dir->entry));
+    dir->entry.num_links = 1;
+    dir->entry.type = INODE_DIRECTORY;
+    
+    // create entry in dir
+    inodes.insert(ctx, dir, ".", dirno);
+    inodes.insert(ctx, dir, "..", ino->inode_no);
+
+    // create entry in parent dir
+    inodes.insert(ctx, ino, buf, dirno);
+    ino->entry.num_links ++;
+
+    // sync, release
+    inodes.sync(ctx, ino, true);
+    inodes.sync(ctx, dir, true);
+    inodes.put(ctx, ino);
+    inodes.put(ctx, ino);
+    bcache.end_op(ctx);
+
+    kfree(buf);
+    kfree(ctx);
+    return 0;
+}
+
+// change directory. requires a kernel virtual address.
+int sys_chdir(const char *path)
+{
+    ASSERT(IS_KERNEL_ADDR(path));
+
+    Proc *proc = thisproc();
+    char *buf = kalloc(256);
+    ASSERT(proc->cwd != NULL);
+    ASSERT(proc->cwd->valid);
+    if (buf == NULL) {
+        kfree(buf);
+        return -1;
+    }
+
+    // check path name
+    if (*path == 0) {
+        // empty path name, fail
+        kfree(buf);
+        return -1;
+    }   
+
+    // walk from start
+    Inode *start = *path == '/' ? inodes.share(inodes.root) // absolute
+                                  :
+                                  inodes.share(proc->cwd); // relative
+    while (*path == '/') {
+        path++;
+    }
+
+    if (*path == 0) {
+        // change dir to root: allowd.
+        inodes.put(NULL, start);
+        inodes.put(NULL, proc->cwd);
+        proc->cwd = inodes.share(inodes.root);
+        kfree(buf);
+        return 0;
+    }
+
+    // start walking
+    Inode *ino = walk(start, path, buf);
+    ASSERT(ino->valid);
+    ASSERT(*buf != '/');
+    if (ino == NULL) {
+        // fail
+        kfree(buf);
+        return NULL;
+    }
+
+    usize dno = inodes.lookup(ino, buf, NULL);
+    inodes.put(NULL, ino);
+    if (dno == 0) {
+        // path not exist
+        kfree(buf);
+        return -1;
+    }
+
+    // to the destination
+    Inode *dir = inodes.get(dno);
+    ASSERT(dir->inode_no == dno);
+    ASSERT(dir->rc.count > 0);
+    inodes.sync(NULL, dir, false);
+    if (dir->entry.type != INODE_DIRECTORY) {
+        // not a directory, fail
+        // proc->cwd does not change.
+        kfree(buf);
+        return -1;
+    }
+
+    // set new cwd for this proc.
+    inodes.put(NULL, proc->cwd);
+    proc->cwd = dir;
+    return 0;
+}
+
+int sys_readdir(int fd, char *buf)
+{
+    ASSERT(IS_KERNEL_ADDR(buf));
+
+    if (fd < 0 || fd >= 16) {
+        // invalid fd
+        return -1;
+    }
+    // get open file table.
+    Proc *proc = thisproc();
+    File *fobj = proc->ofile.ofile[fd];
+
+    if (fobj == NULL || fobj->type != FD_INODE) {
+        // invalid fd
+        return -1;
+    }
+
+    Inode *ino = fobj->ino;
+    ASSERT(ino != NULL);
+    if (!ino->valid) {
+        inodes.sync(NULL, ino, false);
+    }
+    if (ino->entry.type != INODE_DIRECTORY) {
+        // invalid inode
+        return -1;
+    }
+
+    if (inodes.read(ino, (u8 *)buf, fobj->off, 
+                    sizeof(DirEntry)) != sizeof(DirEntry)) {
+        // fail
+        return -1;
+    }
+    ASSERT(fobj->off % sizeof(DirEntry) == 0);
+    fobj->off += sizeof(DirEntry);
+    return 0;
+}
+
+int sys_open(const char *path, int flags)
+{
+    ASSERT(IS_KERNEL_ADDR(path));
+    // alloc fd.
+    Proc *proc = thisproc();
+    int fd = -1;
+    for (int i = 0; i < 16; i++) {
+        if (proc->ofile.ofile[i] == NULL) {
+            fd = i;
+            break;
+        }
+    }
+    if (fd < 0) {
+        return -1;
+    }
+
+    File *fobj = fopen(path, flags);
+    if (fobj == NULL) {
+        // fail
+        return -1;
+    }
+
+    proc->ofile.ofile[fd] = fobj;
+    fobj->type = FD_INODE;
+    return fd;
+}
+
+int sys_close(int fd)
+{
+    if (fd < 0 || fd >= 16) {
+        // invalid fd, fail
+        return -1;
+    }
+
+    Proc *proc = thisproc();
+    File *fobj = proc->ofile.ofile[fd];
+    if (fobj == NULL) {
+        // invalid fd, fail
+        return -1;
+    }
+
+    fclose(fobj);
+    // clear in the opent able
+    proc->ofile.ofile[fd] = NULL;
+    return 0;
 }

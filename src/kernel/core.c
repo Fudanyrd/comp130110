@@ -31,6 +31,7 @@ NO_RETURN void idle_entry()
 NO_RETURN void kernel_entry()
 {
     printk("Hello world! (Core %lld)\n", cpuid());
+    // user_proc_test();
 
     // before doing anything else, 
     // initialize the file system first.
@@ -47,9 +48,9 @@ NO_RETURN void kernel_entry()
     thisproc()->ucontext = &ctx;
 
     char *argv[] = {
-        "/init", "foo", "bar", "baz", NULL
+        "/init", ".", "/", "/init", NULL
     };
-    exec("/init", argv);
+    exec(argv[0], argv);
     
     // the user space is ready, now jump to the 
     // user space via trap_ret. This should be 
@@ -61,9 +62,6 @@ NO_RETURN void kernel_entry()
       :
       : "r"(&ctx)
     );
-
-    // TODO
-    // run init program.
 
     while (1)
         yield();

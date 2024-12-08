@@ -105,6 +105,13 @@ void init_proc(Proc *p)
     // initialize page table
     init_pgdir(&p->pgdir);
 
+    // init open file table.
+    for (int i = 0; i < 16; i++) {
+        p->ofile.ofile[i] = NULL;
+    }
+    // warning: cwd is not initialized and should 
+    // be set either to the parent's dir or root.
+
     // init scheduler info here
 #ifdef RCC
     ASSERT(p->pid >= 0);
