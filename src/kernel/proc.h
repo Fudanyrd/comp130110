@@ -10,6 +10,8 @@
 #include <fdutil/stddef.h>
 #include <fdutil/lst.h>
 #include <kernel/pt.h>
+#include <fs/defines.h>
+#include <fs/file1206.h>
 
 enum procstate { UNUSED, RUNNABLE, RUNNING, SLEEPING, DEEPSLEEPING, ZOMBIE };
 
@@ -113,6 +115,8 @@ typedef struct Proc {
     void *kstack;
     KernelContext kcontext;
     UserContext *ucontext;
+    Inode *cwd;  // current working directory
+    struct oftable ofile;
 } Proc;
 
 void init_kproc();
