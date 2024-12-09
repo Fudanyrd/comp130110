@@ -4,9 +4,6 @@
 #include <kernel/pt.h>
 #include <common/string.h>
 
-// see aarch64/forkret.S.
-extern void fork_return(uintptr_t sp, uintptr_t entry);
-
 /** Install the section into page table.
  * @return 0 on success. 
  */
@@ -94,11 +91,10 @@ extern int exec(const char *path, char **argv)
     *(u64 *)sp = narg;
     // must align to 16 bytes.
     ASSERT((u64) sp % 0x10 == 0);
-    // set x0, sp to the current pointer.
-    ctx->sp = ctx->x0 = STACK_START - PAGE_SIZE + (sp - (char *)stkpg);
-    // x1 is the value of return addr.
-    ctx->x1 = ehdr->e_entry;
-    ctx->elr = (u64)fork_return;
+    // set sp to the current pointer.
+    ctx->sp = STACK_START - PAGE_SIZE + (sp - (char *)stkpg);
+    // set elr to the executable entry.
+    ctx->elr = ehdr->e_entry;
 
     // free allocated resources.
     kfree(ehdr);
