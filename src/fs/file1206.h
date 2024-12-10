@@ -54,6 +54,11 @@ typedef struct file {
     // offset of the file in bytes.
     // For a pipe, it is the number of bytes that have been written/read.
     usize off;
+
+    // reviewer may be concerned about concurrent access to 
+    // off and ref. But we ensure that must hold inode's lock when
+    // accessing off. Others like pipe and socket is not seekable,
+    // so off is not used.
 } File;
 
 // Opended file by a process

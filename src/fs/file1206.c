@@ -22,12 +22,14 @@ void fs_init()
     ASSERT(inodes.root->inode_no == ROOT_INODE_NO);
 }
 
-/** Initialize an inode */
+/** Initialize an inode. Must not hold lock. */
 static inline void init_dir(Inode *ino)
 {
     inodes.sync(NULL, ino, false);
+    inodes.lock(ino);
     memset(&ino->entry, 0, sizeof(ino->entry));
     ino->entry.num_links = 0x1;
+    inodes.unlock(ino);
 }
 
 /** Walk on the directory tree.
@@ -56,7 +58,9 @@ static Inode *walk(Inode *start, const char *path, char *buf)
         return start;
     }
 
+    inodes.lock(start);
     usize nextno = inodes.lookup(start, buf, NULL);
+    inodes.unlock(start);
     Inode *next;
     if (nextno == 0) {
         // fail to find dir.
@@ -90,6 +94,7 @@ static Inode *touch_here(Inode *start, const char *path)
     Inode *next = inodes.get(no);
     inodes.sync(ctx, next, false);
     ASSERT(next->valid);
+    inodes.lock(start);
     if (inodes.insert(ctx, start, path, no) == (usize)-1) {
         // already exists, this should not happen
         PANIC();
@@ -97,10 +102,13 @@ static Inode *touch_here(Inode *start, const char *path)
 
     // increment number of links
     start->entry.num_links++;
+    inodes.unlock(start);
 
     // init the file.
+    inodes.lock(next);
     init_dir(next);
     next->entry.type = INODE_REGULAR;
+    inodes.unlock(next);
 
     // done.
     inodes.sync(ctx, next, true);
@@ -165,7 +173,10 @@ File *fopen(const char *path, int flags)
 
     // lookup in the dir
     Inode *fino;
+    inodes.lock(ino);
     usize no = inodes.lookup(ino, buf, NULL);
+    inodes.unlock(ino);
+
     if (no == 0) {
         if ((flags & F_CREATE) == 0) {
             // fail
@@ -232,8 +243,10 @@ static inline isize file_read(File *fobj, char *buf, u64 count)
         return 0;
     }
 
+    inodes.lock(ino);
     isize ret = inodes.read(ino, (u8 *)buf, fobj->off, count);
     fobj->off += ret;
+    inodes.unlock(ino);
     return ret;
 }
 
@@ -321,11 +334,13 @@ static isize fino_write(File *fobj, char *addr, isize n)
         goto fiw_bad;
     }
 
+    inodes.lock(ino);
     // we allows write beyond the file, 
     // so do not check offset.
     usize incr = inodes.write(ctx, ino, (u8 *)addr, fobj->off, (usize)n);
     // update the offset
     fobj->off += incr;
+    inodes.unlock(ino);
 
     bcache.end_op(ctx);
     kfree(ctx);
@@ -403,8 +418,11 @@ int sys_mkdir(const char *path)
         return -1;
     }
 
+    inodes.lock(ino);
     // lookup in the dir first.
     usize no = inodes.lookup(ino, buf, NULL);
+    inodes.unlock(ino);
+
     if (no != 0) {
         // fail: already exists
         inodes.put(NULL, ino);
@@ -425,6 +443,9 @@ int sys_mkdir(const char *path)
     u64 dirno = inodes.alloc(ctx, INODE_DIRECTORY);
     Inode *dir = inodes.get(dirno);
     inodes.sync(ctx, dir, false);
+
+    // initialize the directory's inode.
+    inodes.lock(dir);
     memset((void *)&dir->entry, 0, sizeof(dir->entry));
     dir->entry.num_links = 1;
     dir->entry.type = INODE_DIRECTORY;
@@ -432,10 +453,13 @@ int sys_mkdir(const char *path)
     // create entry in dir
     inodes.insert(ctx, dir, ".", dirno);
     inodes.insert(ctx, dir, "..", ino->inode_no);
+    inodes.unlock(dir);
 
     // create entry in parent dir
+    inodes.lock(ino);
     inodes.insert(ctx, ino, buf, dirno);
     ino->entry.num_links ++;
+    inodes.unlock(ino);
 
     // sync, release
     inodes.sync(ctx, ino, true);
@@ -497,7 +521,9 @@ int sys_chdir(const char *path)
         return NULL;
     }
 
+    inodes.lock(ino);
     usize dno = inodes.lookup(ino, buf, NULL);
+    inodes.unlock(ino);
     inodes.put(NULL, ino);
     if (dno == 0) {
         // path not exist
@@ -559,6 +585,7 @@ int sys_readdir(int fd, char *buf)
     }
 
     bool success = false;
+    inodes.lock(ino);
     while (fobj->off < ino->entry.num_bytes) {
         inodes.read(ino, (u8 *)buf, fobj->off, sizeof(DirEntry));
         fobj->off += sizeof(DirEntry);
@@ -568,6 +595,7 @@ int sys_readdir(int fd, char *buf)
             break;
         }
     }    
+    inodes.unlock(ino);
 
     // seek reaches end.
     return success ? 0 : (-1);
