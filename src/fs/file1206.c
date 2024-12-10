@@ -431,7 +431,7 @@ int sys_mkdir(const char *path)
     }
 
     // create a ctx and start op
-    OpContext *ctx = kalloc(sizeof(ctx));
+    OpContext *ctx = kalloc(sizeof(OpContext));
     bcache.begin_op(ctx);
     if (ctx == NULL) {
         inodes.put(NULL, ino);
@@ -465,7 +465,7 @@ int sys_mkdir(const char *path)
     inodes.sync(ctx, ino, true);
     inodes.sync(ctx, dir, true);
     inodes.put(ctx, ino);
-    inodes.put(ctx, ino);
+    inodes.put(ctx, dir);
     bcache.end_op(ctx);
 
     kfree(buf);

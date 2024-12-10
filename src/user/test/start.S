@@ -43,3 +43,9 @@ sys_chdir:
     mov w8, #6
     svc #0
     ret
+
+.globl sys_mkdir
+sys_mkdir:
+    mov w8, #7
+    svc #0
+    ret

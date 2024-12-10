@@ -19,6 +19,7 @@ void syscall_close(UserContext *ctx);
 void syscall_readdir(UserContext *ctx);
 void syscall_read(UserContext *ctx);
 void syscall_chdir(UserContext *ctx);
+void syscall_mkdir(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -30,7 +31,8 @@ void *syscall_table[NR_SYSCALL] = {
     [4] = (void *)syscall_readdir,
     [5] = (void *)syscall_read,
     [6] = (void *)syscall_chdir,
-    [7 ... NR_SYSCALL - 1] = NULL,
+    [7] = (void *)syscall_mkdir,
+    [8 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -258,11 +260,33 @@ void syscall_chdir(UserContext *ctx)
     }
     if (copyinstr(pd, buf, ctx->x0) != 0) {
         kfree_page(buf);
-        ret = -1;
+        ctx->x0 = -1;
+        return;
     }
     ret = sys_chdir(buf);
     kfree_page(buf);
     ctx->x0 = ret;
+}
+
+void syscall_mkdir(UserContext *ctx)
+{
+    // hint:
+    // int sys_mkdir(const char *path);
+    char *buf = kalloc_page();
+    if (buf == NULL) {
+        // fail
+        ctx->x0 = -1;
+        return;
+    }
+
+    struct pgdir *pd = &thisproc()->pgdir;
+    if (copyinstr(pd, buf, ctx->x0) != 0) {
+        ctx->x0 = -1;
+        kfree_page(buf);
+        return; 
+    }
+    ctx->x0 = sys_mkdir(buf);
+    kfree_page(buf);
 }
 
 #pragma GCC diagnostic pop
