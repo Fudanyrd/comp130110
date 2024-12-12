@@ -2,7 +2,15 @@
 #include <fs/file1206.h>
 #include <kernel/mem.h>
 #include <kernel/pt.h>
+#include <kernel/proc.h>
 #include <common/string.h>
+
+// aarch64/trap.S
+extern void trap_return(u64);
+// kernel/proc.c
+extern int start_with_kcontext(Proc *p);
+// kernel/sched.c
+extern void proc_entry(void (*entry)(u64), u64 arg);
 
 /** Install the section into page table.
  * @return 0 on success. 
@@ -209,4 +217,41 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
     return 0;
 install_bad:
     return -1;
+}
+
+// fork implementation that makes parent runs first.
+int fork()
+{
+    Proc *child = create_proc();
+    if (child == NULL) {
+        // fail
+        return -1;
+    }
+    Proc *proc = thisproc();
+
+    // set parent-child relationship
+    set_parent_to_this(child);
+
+    // copy the page dir.
+    pgdir_clone(&child->pgdir, &proc->pgdir);
+
+    // user context, child's return val is 0.
+    ASSERT(child->kstack != NULL && proc->ucontext != NULL);
+    UserContext *ctx = (UserContext *)(child->kstack + 
+                                       PAGE_SIZE - sizeof(UserContext));
+    memcpy(ctx, proc->ucontext, sizeof(UserContext));
+    ctx->x0 = 0;
+
+    // FIXME: inherent the parent's 
+    // open file table!
+
+    // start the child proc.
+    memset(&child->kcontext, 0, sizeof(child->kcontext));
+    child->kcontext.x0 = (u64)trap_return;
+    child->kcontext.lr = (uintptr_t)proc_entry;
+    child->kcontext.sp = (u64)ctx;
+    start_with_kcontext(child);
+
+    // THINK: what is the return value?
+    return child->pid;
 }
