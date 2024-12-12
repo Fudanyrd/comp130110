@@ -230,3 +230,62 @@ void pgdir_add_section(struct pgdir *pgdir, struct section *sec)
     // do not check intersection.
     list_insert_ordered(&pgdir->sections, &sec->node, sec_less_func, NULL);
 }
+
+/* Returns a page of same content as pgdir at va. */
+static void *page_dup(struct pgdir *src, u64 va)
+{
+    ASSERT(va % PAGE_SIZE == 0 && va != 0);
+    PTEntry *pt = get_pte(src, va, false);
+    ASSERT(pt != NULL);
+
+    // kernel addr of source page
+    void *source = (void *)(P2K(*pt & (~0xFFF)));
+
+    // dest page
+    void *pg = kalloc_page();
+    ASSERT(pg != NULL);
+
+    // copy
+    memcpy(pg, source, PAGE_SIZE);
+    return pg;
+}
+
+// install the page at va in src to dst.
+static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va)
+{
+    ASSERT(va % PAGE_SIZE == 0 && va != 0);
+    void *pg = page_dup(src, va);
+
+    PTEntry *pt = get_pte(dst, va, true);
+    ASSERT(pt != NULL);
+
+    // install in dst pgdir.
+    *pt = K2P(pg);
+    *pt |= PTE_USER_DATA;
+
+    return;
+}
+
+void pgdir_clone(struct pgdir *dst, struct pgdir *src)
+{
+    ASSERT(dst != NULL && src != NULL);
+    struct list *l = &src->sections;
+    struct list_elem *elem = list_begin(l);
+
+    if (!list_empty(l)) {
+        for (; elem != list_end(l); elem = list_next(elem)) {
+            struct section *s = list_entry(elem, struct section, node);
+            // make a clone of the node. 
+            struct section *sec = kalloc(sizeof(struct section));
+            sec->flags = s->flags;
+            sec->node = s->node;
+            sec->npages = s->npages;
+            sec->start = s->start;
+
+            // for each of the page, make a clone
+            for (u32 i = 0; i < s->npages; i++) {
+                page_copy(dst, src, s->start + PAGE_SIZE * i);
+            }
+        }
+    }
+}
