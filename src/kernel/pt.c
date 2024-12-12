@@ -278,7 +278,6 @@ void pgdir_clone(struct pgdir *dst, struct pgdir *src)
             // make a clone of the node. 
             struct section *sec = kalloc(sizeof(struct section));
             sec->flags = s->flags;
-            sec->node = s->node;
             sec->npages = s->npages;
             sec->start = s->start;
 
@@ -286,6 +285,9 @@ void pgdir_clone(struct pgdir *dst, struct pgdir *src)
             for (u32 i = 0; i < s->npages; i++) {
                 page_copy(dst, src, s->start + PAGE_SIZE * i);
             }
+
+            // add to the list of dst
+            list_push_back(&dst->sections, &sec->node);
         }
     }
 }

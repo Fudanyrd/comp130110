@@ -22,6 +22,7 @@ void syscall_chdir(UserContext *ctx);
 void syscall_mkdir(UserContext *ctx);
 void syscall_write(UserContext *ctx);
 void syscall_unlink(UserContext *ctx);
+void syscall_fork(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -36,7 +37,8 @@ void *syscall_table[NR_SYSCALL] = {
     [7] = (void *)syscall_mkdir,
     [8] = (void *)syscall_write,
     [9] = (void *)syscall_unlink,
-    [10 ... NR_SYSCALL - 1] = NULL,
+    [10] = (void *)syscall_fork,
+    [11 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -395,6 +397,14 @@ void syscall_unlink(UserContext *ctx)
 
     ctx->x0 = sys_unlink(buf);
     kfree_page(buf);
+    return;
+}
+
+extern int fork();
+
+void syscall_fork(UserContext *ctx)
+{
+    ctx->x0 = fork();
     return;
 }
 
