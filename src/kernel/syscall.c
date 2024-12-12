@@ -20,6 +20,7 @@ void syscall_readdir(UserContext *ctx);
 void syscall_read(UserContext *ctx);
 void syscall_chdir(UserContext *ctx);
 void syscall_mkdir(UserContext *ctx);
+void syscall_write(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -32,7 +33,8 @@ void *syscall_table[NR_SYSCALL] = {
     [5] = (void *)syscall_read,
     [6] = (void *)syscall_chdir,
     [7] = (void *)syscall_mkdir,
-    [8 ... NR_SYSCALL - 1] = NULL,
+    [8] = (void *)syscall_write,
+    [9 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -238,13 +240,41 @@ void syscall_read(UserContext *ctx)
         ctx->x0 = -1;
         return;
     }
-    isize ret = sys_read((int)ctx->x0, buf, ctx->x2);
-    if (ret >= 0 &&
-        copyout(&thisproc()->pgdir, buf, ctx->x1, ret) != 0) {
-        ret = -1;
+
+    isize ret = 0;
+    isize tmp;
+    // user may require more than a page's data.
+    // must satisfy.
+    while (ctx->x2 > PAGE_SIZE) {
+        tmp = sys_read(ctx->x0, buf, PAGE_SIZE);
+        if (tmp < 0) {
+            goto rd_bad;
+        }
+        if (copyout(&thisproc()->pgdir, buf, ctx->x1, tmp) != 0) {
+            goto rd_bad;
+        }
+
+        // advance
+        ctx->x1 += PAGE_SIZE;
+        ctx->x2 -= PAGE_SIZE;
+        ret += tmp;
     }
+    tmp = sys_read((int)ctx->x0, buf, ctx->x2);
+    if (tmp < 0) {
+        goto rd_bad;
+    }
+    if (copyout(&thisproc()->pgdir, buf, ctx->x1, tmp) != 0) {
+        goto rd_bad;
+    }
+    ret += tmp;
     kfree_page(buf);
     ctx->x0 = ret;
+    return;
+
+rd_bad:
+    kfree_page(buf);
+    ctx->x0 = -1;
+    return;
 }
 
 void syscall_chdir(UserContext *ctx)
@@ -287,6 +317,59 @@ void syscall_mkdir(UserContext *ctx)
     }
     ctx->x0 = sys_mkdir(buf);
     kfree_page(buf);
+}
+
+void syscall_write(UserContext *ctx)
+{
+    // note:
+    // isize sys_write(int fd, char *buf, usize count);
+    char *buf = kalloc_page();
+    if (buf == NULL) {
+        // fail
+        ctx->x0 = -1;
+        return;
+    }
+    struct pgdir *pd = &thisproc()->pgdir;
+
+    isize ret = 0;
+    isize tmp;
+
+    // can only copyin 4096 bytes a time.
+    while (ctx->x2 > PAGE_SIZE) {
+        if (copyin(pd, buf, ctx->x1, PAGE_SIZE) != 0) {
+            goto wrt_bad;
+        }
+
+        // do the write.
+        tmp = sys_write(ctx->x0, buf, PAGE_SIZE);
+        if (tmp < 0) {
+            goto wrt_bad;
+        }
+
+        // advance
+        ctx->x2 -= PAGE_SIZE;
+        ctx->x1 += PAGE_SIZE;
+        ret += tmp;
+    }
+    // copyin the rest.
+    if (copyin(pd, buf, ctx->x1, ctx->x2) != 0) {
+        goto wrt_bad;
+    }
+    tmp = sys_write(ctx->x0, buf, ctx->x2);
+    if (tmp < 0) {
+        goto wrt_bad;
+    }
+    ret += tmp;
+
+    kfree_page(buf);
+    ctx->x0 = (u64)ret;
+    return;
+
+    // something unexpected happened.
+wrt_bad:
+    kfree_page(buf);
+    ctx->x0 = -1;
+    return;
 }
 
 #pragma GCC diagnostic pop
