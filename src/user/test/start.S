@@ -61,3 +61,9 @@ sys_unlink:
     mov w8, #9
     svc #0
     ret
+
+.globl sys_fork
+sys_fork:
+    mov w8, #10
+    svc #0
+    ret
