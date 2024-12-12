@@ -17,6 +17,9 @@
 #define F_WRITE 0x2
 #define F_CREATE 0x4
 
+// maximum number of file can open by a proc.
+#define MAXOFILE (16)
+
 extern BlockDevice block_device;
 extern BlockCache bcache;
 extern InodeTree inodes;
@@ -63,7 +66,7 @@ typedef struct file {
 
 // Opended file by a process
 struct oftable {
-    struct file *ofile[16];
+    struct file *ofile[MAXOFILE];
 };
 
 /*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -82,7 +85,7 @@ int sys_open(const char *path, int flags);
 int sys_close(int fd);
 
 isize sys_read(int fd, char *buf, usize count);
-int sys_write(int fd, char *buf, usize count);
+isize sys_write(int fd, char *buf, usize count);
 
 /** Read an dir entry into user buffer. */
 int sys_readdir(int fd, char *buf);
@@ -90,6 +93,11 @@ int sys_readdir(int fd, char *buf);
 /** Returns a duplicate fd. */
 int sys_dup(int fd);
 int sys_dup2(int oldfd, int newfd);
+
+/** Link/Unlink */
+
+int sys_link(const char *src, const char *target);
+int sys_unlink(const char *target);
 
 /*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *                          File Backends

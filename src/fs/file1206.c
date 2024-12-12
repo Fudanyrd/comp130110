@@ -26,10 +26,8 @@ void fs_init()
 static inline void init_dir(Inode *ino)
 {
     inodes.sync(NULL, ino, false);
-    inodes.lock(ino);
     memset(&ino->entry, 0, sizeof(ino->entry));
     ino->entry.num_links = 0x1;
-    inodes.unlock(ino);
 }
 
 /** Walk on the directory tree.
@@ -315,24 +313,15 @@ isize fseek(File *fobj, isize bias, int flag)
     return ret;
 }
 
-/** Write to an inode-based file. */
-static isize fino_write(File *fobj, char *addr, isize n)
-{    
+/** Write a small batch of data to avoid large txn.
+ * @param n it is suggested that n is no larger than 2048, i.e. 4 blocks.
+ */
+static INLINE isize file_write_safe(OpContext *ctx, File *fobj, char *addr, 
+                                    isize n)
+{
+    ASSERT(n <= BLOCK_SIZE * 4);
     Inode *ino = fobj->ino;
-    OpContext *ctx = kalloc(sizeof(OpContext));
-    if (ctx == NULL) {
-        // bad
-        return -1;
-    }
     bcache.begin_op(ctx);
-
-    if (!ino->valid) {
-        inodes.sync(ctx, ino, false);
-    }
-    if (ino->entry.type != INODE_REGULAR) {
-        // not a regular file
-        goto fiw_bad;
-    }
 
     inodes.lock(ino);
     // we allows write beyond the file, 
@@ -342,9 +331,62 @@ static isize fino_write(File *fobj, char *addr, isize n)
     fobj->off += incr;
     inodes.unlock(ino);
 
+    // end op
     bcache.end_op(ctx);
-    kfree(ctx);
     return incr;
+}
+
+/** Write to an inode-based file. */
+static isize fino_write(File *fobj, char *addr, isize n)
+{    
+    Inode *ino = fobj->ino;
+    OpContext *ctx = kalloc(sizeof(OpContext));
+    if (ctx == NULL) {
+        // bad
+        return -1;
+    }
+
+    if (!ino->valid) {
+        inodes.sync(ctx, ino, false);
+    }
+    if (ino->entry.type != INODE_REGULAR) {
+        // not a regular file
+        goto fiw_bad;
+    }
+
+    isize ret = 0;
+    isize nwrt = BLOCK_SIZE - (fobj->off % BLOCK_SIZE);
+    nwrt = n > nwrt ? nwrt : n;
+
+    // write to block boundary first.
+    nwrt = file_write_safe(ctx, fobj, addr, nwrt);
+    if (nwrt < 0) {
+        goto fiw_bad;
+    }
+    // then advance.
+    addr += nwrt;
+    ret += nwrt;
+    n -= nwrt;
+
+    // write in terms of 4 blocks.
+    while (n > 0) {
+        nwrt = BLOCK_SIZE * 4;
+        nwrt = n > nwrt ? nwrt : n;
+
+        // do write safely.
+        nwrt = file_write_safe(ctx, fobj, addr, nwrt);
+        if (nwrt < 0) {
+            goto fiw_bad;
+        }
+
+        // then advance.
+        addr += nwrt;
+        ret += nwrt;
+        n -= nwrt;
+    }
+
+    kfree(ctx);
+    return ret;
 
 fiw_bad:
     bcache.end_op(ctx);
@@ -554,7 +596,7 @@ int sys_readdir(int fd, char *buf)
 {
     ASSERT(IS_KERNEL_ADDR(buf));
 
-    if (fd < 0 || fd >= 16) {
+    if (fd < 0 || fd >= MAXOFILE) {
         // invalid fd
         return -1;
     }
@@ -607,7 +649,7 @@ int sys_open(const char *path, int flags)
     // alloc fd.
     Proc *proc = thisproc();
     int fd = -1;
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < MAXOFILE; i++) {
         if (proc->ofile.ofile[i] == NULL) {
             fd = i;
             break;
@@ -630,7 +672,7 @@ int sys_open(const char *path, int flags)
 
 int sys_close(int fd)
 {
-    if (fd < 0 || fd >= 16) {
+    if (fd < 0 || fd >= MAXOFILE) {
         // invalid fd, fail
         return -1;
     }
@@ -651,7 +693,7 @@ int sys_close(int fd)
 isize sys_read(int fd, char *buf, usize count)
 {
     ASSERT(IS_KERNEL_ADDR(buf));
-    if (fd < 0 || fd >= 16) {
+    if (fd < 0 || fd >= MAXOFILE) {
         // invalid fd 
         return -1;
     }
@@ -664,4 +706,171 @@ isize sys_read(int fd, char *buf, usize count)
     }
 
     return fread(fobj, buf, count);
+}
+
+isize sys_write(int fd, char *buf, usize count)
+{
+    ASSERT(IS_KERNEL_ADDR(buf));
+    if (fd < 0 || fd >= MAXOFILE) {
+        // out of bound access
+        return -1;
+    }
+
+    Proc *proc = thisproc();
+    File *fobj = proc->ofile.ofile[fd];
+    if (fobj == NULL) {
+        return -1;
+    }
+
+    return fwrite(fobj, buf, count);
+}
+
+/** Removes an entry whose inode no is num. Will sync dir.
+ * @throw PANIC() if num is not found.
+ */
+static void inode_rm_entry(OpContext *ctx, Inode *dir, usize num);
+
+/** Unlink a file or directory */
+int sys_unlink(const char *target)
+{
+    ASSERT(IS_KERNEL_ADDR(target));
+    if (*target == NULL) {
+        return -1;
+    }
+
+
+    Proc *proc = thisproc();
+    // walk from start
+    Inode *start = *target == '/' ? inodes.share(inodes.root) // absolute
+                                  :
+                                  inodes.share(proc->cwd); // relative
+    while (*target == '/') {
+        target++;
+    }
+
+    if (*target == 0) {
+        // is root dir, cannot unlink.
+        return -1;
+    }
+
+    // temporary buffer
+    char *buf = kalloc(256);
+    if (buf == NULL) {
+        return -1;
+    }
+
+    // get to destination dir
+    Inode *ino = walk(start, target, buf);
+    if (ino == NULL) {
+        // fail
+        kfree(buf);
+        return NULL;
+    }
+
+    // number of dest inode
+    inodes.lock(ino);
+    usize no = inodes.lookup(ino, buf, NULL);
+    inodes.unlock(ino);
+    kfree(buf); buf = NULL;
+
+    if (no == 0) {
+        // no such file or directory
+        inodes.put(NULL, ino);
+        return -1;
+    }
+
+    // targeted inode
+    Inode *tgt = inodes.get(no);
+    inodes.sync(NULL, tgt, false);
+    ASSERT(tgt->inode_no == no && tgt->valid);
+    ASSERT(tgt->entry.num_links > 0);
+
+    if (tgt->entry.type == INODE_INVALID) {
+        // inode type not recognized.
+        inodes.put(NULL, ino);
+        inodes.put(NULL, tgt);
+        return -1;
+    }
+
+    // allocate context, and start op
+    OpContext *ctx = kalloc(sizeof(OpContext));
+    if (ctx == NULL) {
+        return -1;
+    }
+    int ret = 0;
+    bcache.begin_op(ctx);
+
+    // in the following steps, put ino
+    // and tgt's parent inode.
+    if (tgt->entry.type == INODE_DIRECTORY) {
+        if (tgt->entry.num_links > 1) {
+            // fail
+            ret = -1;
+        } else {
+            tgt->entry.num_links = 0;
+            inodes.sync(ctx, tgt, true);
+
+            // should find the parent number
+            inodes.lock(tgt);
+            usize pno = inodes.lookup(tgt, "..", NULL);
+            inodes.unlock(tgt);
+            ASSERT(pno != no);
+
+            // parent inode of tgt
+            Inode *pr = inodes.get(pno);
+            inodes.sync(ctx, pr, false);
+
+            // remove the entry tgt from parent dir.
+            inode_rm_entry(ctx, pr, no);
+
+            // clean up
+            inodes.put(ctx, pr);
+        }
+        inodes.put(ctx, ino);
+    } else {
+        tgt->entry.num_links--;
+        inodes.sync(ctx, tgt, true);
+
+        // parent dir of tgt is ino!
+        inode_rm_entry(ctx, ino, no);
+
+        // clean up
+        inodes.put(ctx, ino);
+    }
+
+    // end op, clean up
+    inodes.put(ctx, tgt);
+    bcache.end_op(ctx);
+    kfree(ctx);
+
+    return ret;
+}
+
+static void inode_rm_entry(OpContext *ctx, Inode *dir, usize num)
+{
+    ASSERT(dir->valid);
+    ASSERT(dir->entry.type == INODE_DIRECTORY && dir->entry.num_links > 0
+           && dir->entry.num_bytes > 2 * sizeof(DirEntry));
+
+    DirEntry entry;
+    usize offset = 0;
+    while (offset < dir->entry.num_bytes) {
+        inodes.read(dir, (u8 *)&entry, offset, sizeof(DirEntry));
+        if (entry.inode_no == num) {
+            // found!
+            break;
+        }
+        offset += sizeof(DirEntry);
+    }
+
+    if (offset >= dir->entry.num_bytes) {
+        PANIC();
+    }
+
+    // erase the entry.
+    entry.inode_no = 0;
+    entry.name[0] = 0;
+
+    // write back.
+    inodes.write(ctx, dir, (u8 *)&entry, offset, sizeof(DirEntry));
 }
