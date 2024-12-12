@@ -151,6 +151,8 @@ PTEntriesPtr get_pte(struct pgdir *pgdir, u64 va, bool alloc)
 void init_pgdir(struct pgdir *pgdir)
 {
     pgdir->pt = NULL;
+    // empty sections
+    list_init(&pgdir->sections);
 }
 
 /** Free a page table at level lv
@@ -192,6 +194,15 @@ void free_pgdir(struct pgdir *pgdir)
     // recursively free all pages used by page table
     pgdir_free_lv(pgdir->pt, 0);
     pgdir->pt = NULL;
+
+    // free the sections.
+    struct list_elem *elem;
+    while (!list_empty(&pgdir->sections)) {
+        elem = list_pop_front(&pgdir->sections);
+        struct section *sec = list_entry(elem, struct section, node);
+        ASSERT(sec->start % PAGE_SIZE == 0);
+        kfree(sec);
+    }
 }
 
 void attach_pgdir(struct pgdir *pgdir)
@@ -201,4 +212,21 @@ void attach_pgdir(struct pgdir *pgdir)
         arch_set_ttbr0(K2P(pgdir->pt));
     else
         arch_set_ttbr0(K2P(&invalid_pt));
+}
+
+static bool sec_less_func(const struct list_elem *a, const struct list_elem *b,
+                          void *aux)
+{
+    struct section *sa = list_entry(a, struct section, node);
+    struct section *sb = list_entry(b, struct section, node);
+    ASSERT(sa->start % PAGE_SIZE == 0);
+    ASSERT(sb->start % PAGE_SIZE == 0);
+    return sa->start < sb->start;
+}
+
+void pgdir_add_section(struct pgdir *pgdir, struct section *sec)
+{
+    ASSERT(sec != NULL);
+    // do not check intersection.
+    list_insert_ordered(&pgdir->sections, &sec->node, sec_less_func, NULL);
 }

@@ -50,6 +50,14 @@ extern int exec(const char *path, char **argv)
     void *stkpg = kalloc_page();
     *entr = K2P(stkpg) | PTE_USER_DATA;
 
+    // add the stack area in pgdir.
+    struct section *sec = kalloc(sizeof(struct section));
+    sec->flags = 0;
+    sec->npages = 1;
+    sec->start = (u64)(STACK_START - PAGE_SIZE);
+    pgdir_add_section(pd, sec);
+    sec = NULL; // avoid modification
+
     // setup a user context for trap_return.
     UserContext *ctx = proc->ucontext;
     memset(ctx, 0, sizeof(*ctx));
@@ -132,6 +140,15 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
     PTEntry prot = PTE_USER_DATA;
     void *start = addr_round_down(ph->p_vaddr, PAGE_SIZE); 
     void *end = addr_round_up(ph->p_vaddr + ph->p_memsz, PAGE_SIZE);
+
+    // record in the proc's pgdir.
+    struct section *sec = kalloc(sizeof(struct section));
+    sec->flags = 0;
+    sec->npages = (end - start) / PAGE_SIZE;
+    sec->start = (u64)start;
+    pgdir_add_section(pd, sec);
+    sec = NULL; // avoid further modification
+
     isize offset = ph->p_offset;
     isize nread = ph->p_filesz;
 
