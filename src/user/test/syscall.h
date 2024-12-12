@@ -20,6 +20,25 @@ typedef u64 usize;
 
 // in fs/defines.h
 
+#define BLOCK_SIZE 512
+
+// maximum number of distinct block numbers can be recorded in the log header.
+#define LOG_MAX_SIZE ((BLOCK_SIZE - sizeof(usize)) / sizeof(usize))
+
+#define INODE_NUM_DIRECT 11
+// 128
+#define INODE_NUM_INDIRECT (BLOCK_SIZE / sizeof(u32))
+// (128 * 128)
+#define INODE_NUM_DINDIRECT (INODE_NUM_INDIRECT * INODE_NUM_INDIRECT)
+
+#define INODE_PER_BLOCK (BLOCK_SIZE / sizeof(InodeEntry))
+// (11 + 128 + 128 * 128)
+#define INODE_MAX_BLOCKS \
+    (INODE_NUM_DIRECT + INODE_NUM_INDIRECT + INODE_NUM_DINDIRECT)
+#define INODE_MAX_BYTES (INODE_MAX_BLOCKS * BLOCK_SIZE)
+
+#define DIRENTR_PER_BLOCK (BLOCK_SIZE / sizeof(DirEntry))
+
 // directory entry. `inode_no == 0` implies this entry is free.
 // the maximum length of file names, including trailing '\0'.
 #define FILE_NAME_MAX_LENGTH 14
