@@ -55,3 +55,9 @@ sys_write:
     mov w8, #8
     svc #0
     ret
+
+.globl sys_unlink
+sys_unlink:
+    mov w8, #9
+    svc #0
+    ret
