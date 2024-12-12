@@ -49,3 +49,9 @@ sys_mkdir:
     mov w8, #7
     svc #0
     ret
+
+.globl sys_write
+sys_write:
+    mov w8, #8
+    svc #0
+    ret
