@@ -874,3 +874,32 @@ static void inode_rm_entry(OpContext *ctx, Inode *dir, usize num)
     // write back.
     inodes.write(ctx, dir, (u8 *)&entry, offset, sizeof(DirEntry));
 }
+
+File *fshare(File *src)
+{
+    if (src == NULL) {
+        return NULL;
+    }
+
+    // need to hold lock to avoid concurrent
+    // share to src->ref.
+    __atomic_fetch_add(&src->ref, 1, __ATOMIC_ACQ_REL);
+    switch (src->type) {
+    case (FD_INODE): {
+        inodes.share(src->ino);
+        break;
+    }
+    case (FD_PIPE): {
+        if (src->readable) {
+            pipe_reopen_read(src->pipe);
+        }
+        if (src->writable) {
+            pipe_reopen_write(src->pipe);
+        }
+    }
+    default: {
+        break;
+    }
+    }
+    return src;
+}

@@ -121,3 +121,6 @@ isize fseek(File *fobj, isize bias, int flag);
 isize fread(File *fobj, char *buf, u64 count);
 
 isize fwrite(File* fobj, char* addr, isize n);
+
+/** Share a file object, will have the same offset. */
+File *fshare(File *src);
