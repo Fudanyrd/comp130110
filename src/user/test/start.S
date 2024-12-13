@@ -73,3 +73,9 @@ sys_exit:
     mov w8, #11
     svc #0
     ret
+
+.globl sys_wait
+sys_wait:
+    mov w8, #12
+    svc #0
+    ret

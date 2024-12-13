@@ -24,6 +24,7 @@ void syscall_write(UserContext *ctx);
 void syscall_unlink(UserContext *ctx);
 void syscall_fork(UserContext *ctx);
 void syscall_exit(UserContext *ctx);
+void syscall_wait(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -40,7 +41,8 @@ void *syscall_table[NR_SYSCALL] = {
     [9] = (void *)syscall_unlink,
     [10] = (void *)syscall_fork,
     [11] = (void *)syscall_exit,
-    [12 ... NR_SYSCALL - 1] = NULL,
+    [12] = (void *)syscall_wait,
+    [13 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -431,6 +433,17 @@ void syscall_exit(UserContext *ctx)
     }
 
     exit(ctx->x0);
+}
+
+void syscall_wait(UserContext *ctx)
+{
+    int code;
+    int pid = wait(&code);
+
+    if (pid >= 0 && ctx->x0 != 0) {
+        copyout(&thisproc()->pgdir, &code, ctx->x0, sizeof(code));
+    }
+    ctx->x0 = pid;
 }
 
 #pragma GCC diagnostic pop
