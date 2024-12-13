@@ -1,6 +1,10 @@
 #define pushp(a, b) stp a, b, [sp, #-0x10]!
 #define popp(a, b) ldp a, b, [sp], #0x10 
 
+// Hint: [ARMv8-A-Programmer-Guide:4.1]
+// there's dedicated stack pointer(sp) at each exception level.
+// At user level, that is sp_el0.
+
 /* `exception_vector.S` send all traps here. */
 .global trap_entry
 trap_entry:
@@ -37,7 +41,7 @@ trap_entry:
     str x28, [sp, #224]
     str lr,  [sp, #232]
     str fp,  [sp, #240]
-    mov x0, sp
+    mrs x0, sp_el0
     str x0,  [sp, #248]
     mrs x0, spsr_el1
     str x0, [sp, #256]
@@ -81,6 +85,9 @@ trap_return:
     ldr x28, [sp, #224]
     ldr lr,  [sp, #232]
     ldr fp,  [sp, #240]
+    // recover sp_el0, spsr_el1 and elr_el1.
+    ldr x0, [sp, #248]
+    msr sp_el0, x0
     ldr x0,  [sp, #256]
     msr spsr_el1, x0
     ldr x0,  [sp, #264]

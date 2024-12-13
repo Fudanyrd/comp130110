@@ -10,12 +10,24 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Woverride-init"
 
+extern int exec(const char *path, char **argv);
+
 /** Syscall executor type */
 typedef void (*syscall_fn)(UserContext *);
 
 void syscall_print(UserContext *ctx);
 void syscall_open(UserContext *ctx);
 void syscall_close(UserContext *ctx);
+void syscall_readdir(UserContext *ctx);
+void syscall_read(UserContext *ctx);
+void syscall_chdir(UserContext *ctx);
+void syscall_mkdir(UserContext *ctx);
+void syscall_write(UserContext *ctx);
+void syscall_unlink(UserContext *ctx);
+void syscall_fork(UserContext *ctx);
+void syscall_exit(UserContext *ctx);
+void syscall_wait(UserContext *ctx);
+void syscall_execve(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -24,7 +36,17 @@ void *syscall_table[NR_SYSCALL] = {
     [1] = (void *)syscall_print,
     [2] = (void *)syscall_open,
     [3] = (void *)syscall_close,
-    [4 ... NR_SYSCALL - 1] = NULL,
+    [4] = (void *)syscall_readdir,
+    [5] = (void *)syscall_read,
+    [6] = (void *)syscall_chdir,
+    [7] = (void *)syscall_mkdir,
+    [8] = (void *)syscall_write,
+    [9] = (void *)syscall_unlink,
+    [10] = (void *)syscall_fork,
+    [11] = (void *)syscall_exit,
+    [12] = (void *)syscall_wait,
+    [13] = (void *)syscall_execve,
+    [14 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -204,6 +226,293 @@ void syscall_close(UserContext *ctx)
     // note:
     // int sys_close(int fd);
     ctx->x0 = sys_close((int)ctx->x0);
+}
+
+void syscall_readdir(UserContext *ctx)
+{
+    // note:
+    // int sys_readdir(int fd, char *buf);
+    DirEntry *dir = kalloc(sizeof(DirEntry));
+    int ret = sys_readdir((int)ctx->x0, (char *)dir);
+    u64 uva = ctx->x1;
+    if (ret >= 0 && 
+        copyout(&thisproc()->pgdir, dir, uva, sizeof(DirEntry)) != 0) {
+        ret = -1;
+    }
+    kfree(dir);
+    ctx->x0 = (int)ret;
+}
+
+void syscall_read(UserContext *ctx)
+{
+    // note:
+    // int sys_read(int fd, char *buf, usize count);
+    char *buf = kalloc_page();
+    if (buf == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+
+    isize ret = 0;
+    isize tmp;
+    // user may require more than a page's data.
+    // must satisfy.
+    while (ctx->x2 > PAGE_SIZE) {
+        tmp = sys_read(ctx->x0, buf, PAGE_SIZE);
+        if (tmp < 0) {
+            goto rd_bad;
+        }
+        if (copyout(&thisproc()->pgdir, buf, ctx->x1, tmp) != 0) {
+            goto rd_bad;
+        }
+
+        // advance
+        ctx->x1 += PAGE_SIZE;
+        ctx->x2 -= PAGE_SIZE;
+        ret += tmp;
+    }
+    tmp = sys_read((int)ctx->x0, buf, ctx->x2);
+    if (tmp < 0) {
+        goto rd_bad;
+    }
+    if (copyout(&thisproc()->pgdir, buf, ctx->x1, tmp) != 0) {
+        goto rd_bad;
+    }
+    ret += tmp;
+    kfree_page(buf);
+    ctx->x0 = ret;
+    return;
+
+rd_bad:
+    kfree_page(buf);
+    ctx->x0 = -1;
+    return;
+}
+
+void syscall_chdir(UserContext *ctx)
+{
+    // note:
+    // int sys_chdir(const char *path);
+    char *buf = kalloc_page();
+    struct pgdir *pd = &thisproc()->pgdir;
+    int ret;
+    if (buf == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+    if (copyinstr(pd, buf, ctx->x0) != 0) {
+        kfree_page(buf);
+        ctx->x0 = -1;
+        return;
+    }
+    ret = sys_chdir(buf);
+    kfree_page(buf);
+    ctx->x0 = ret;
+}
+
+void syscall_mkdir(UserContext *ctx)
+{
+    // hint:
+    // int sys_mkdir(const char *path);
+    char *buf = kalloc_page();
+    if (buf == NULL) {
+        // fail
+        ctx->x0 = -1;
+        return;
+    }
+
+    struct pgdir *pd = &thisproc()->pgdir;
+    if (copyinstr(pd, buf, ctx->x0) != 0) {
+        ctx->x0 = -1;
+        kfree_page(buf);
+        return; 
+    }
+    ctx->x0 = sys_mkdir(buf);
+    kfree_page(buf);
+}
+
+void syscall_write(UserContext *ctx)
+{
+    // note:
+    // isize sys_write(int fd, char *buf, usize count);
+    char *buf = kalloc_page();
+    if (buf == NULL) {
+        // fail
+        ctx->x0 = -1;
+        return;
+    }
+    struct pgdir *pd = &thisproc()->pgdir;
+
+    isize ret = 0;
+    isize tmp;
+
+    // can only copyin 4096 bytes a time.
+    while (ctx->x2 > PAGE_SIZE) {
+        if (copyin(pd, buf, ctx->x1, PAGE_SIZE) != 0) {
+            goto wrt_bad;
+        }
+
+        // do the write.
+        tmp = sys_write(ctx->x0, buf, PAGE_SIZE);
+        if (tmp < 0) {
+            goto wrt_bad;
+        }
+
+        // advance
+        ctx->x2 -= PAGE_SIZE;
+        ctx->x1 += PAGE_SIZE;
+        ret += tmp;
+    }
+    // copyin the rest.
+    if (copyin(pd, buf, ctx->x1, ctx->x2) != 0) {
+        goto wrt_bad;
+    }
+    tmp = sys_write(ctx->x0, buf, ctx->x2);
+    if (tmp < 0) {
+        goto wrt_bad;
+    }
+    ret += tmp;
+
+    kfree_page(buf);
+    ctx->x0 = (u64)ret;
+    return;
+
+    // something unexpected happened.
+wrt_bad:
+    kfree_page(buf);
+    ctx->x0 = -1;
+    return;
+}
+
+void syscall_unlink(UserContext *ctx)
+{
+    // note:
+    // int sys_unlink(const char *target);
+
+    char *buf = kalloc_page();
+    if (buf == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+
+    struct pgdir *pd = &thisproc()->pgdir;
+    if (copyinstr(pd, buf, ctx->x0) != 0) {
+        // fail
+        kfree_page(buf);
+        ctx->x0 = -1;
+        return;
+    }
+
+    ctx->x0 = sys_unlink(buf);
+    kfree_page(buf);
+    return;
+}
+
+extern int fork();
+
+void syscall_fork(UserContext *ctx)
+{
+    ctx->x0 = fork();
+    return;
+}
+
+void syscall_exit(UserContext *ctx)
+{
+    extern Proc root_proc;
+    Proc *proc = thisproc();
+    if (proc == &root_proc) {
+        // root exit. ?
+        PANIC();
+    }
+
+    // release its current working dir.
+    inodes.put(NULL, proc->cwd);
+
+    // release its file descriptors.
+    for (int i = 0; i < MAXOFILE; i++) {
+        File *fobj = proc->ofile.ofile[i];
+        if (fobj != NULL) {
+            fclose(fobj);
+        }
+    }
+
+    exit(ctx->x0);
+}
+
+void syscall_wait(UserContext *ctx)
+{
+    int code;
+    int pid = wait(&code);
+
+    if (pid >= 0 && ctx->x0 != 0) {
+        copyout(&thisproc()->pgdir, &code, ctx->x0, sizeof(code));
+    }
+    ctx->x0 = pid;
+}
+
+void syscall_execve(UserContext *ctx)
+{
+    struct pgdir *pd = &thisproc()->pgdir;
+    // return value 
+    int ret = 0;
+    // name of executable
+    char *ename = kalloc_page();
+    if (ename == NULL) {
+        ret = -1;
+        goto exe_bad;
+    }
+    if (copyinstr(pd, ename, ctx->x0) != 0) {
+        ret = -1;
+        goto exe_bad2;
+    }
+
+    // zero-init argv array
+    char **argv = kalloc(EXE_MAX_ARGS * sizeof(void *));
+    if (argv == NULL) {
+        ret = -1;
+        goto exe_bad2;
+    }
+    for (int i = 0; i < EXE_MAX_ARGS; i++) {
+        argv[i] = NULL;
+    }
+
+    // copy argv from user space
+    u64 narg = 0;
+    for (u64 va = ctx->x1; ;va += sizeof(void *)) {
+        u64 uvaddr;
+        if (copyin(pd, (void *)&uvaddr, va, sizeof(uvaddr)) != 0) {
+            ret = -1;
+            goto exe_bad1;
+        }
+        if (uvaddr == NULL) {
+            // end
+            break;
+        }
+
+        // copy string from user
+        argv[narg] = kalloc_page();
+        if (argv[narg] == NULL || copyinstr(pd, argv[narg], uvaddr) != 0) {
+            ret = -1;
+            goto exe_bad1;
+        }
+
+        narg++;
+    }
+
+    // execute command.
+    ret = exec(ename, argv);
+
+// free up resources.
+exe_bad1:
+    for (int i = 0; argv[i] != NULL; i++) {
+        kfree_page(argv[i]);
+    }
+    kfree(argv);
+exe_bad2:
+    kfree_page(ename);
+exe_bad: 
+    ctx->x0 = ret;
+    return;
 }
 
 #pragma GCC diagnostic pop

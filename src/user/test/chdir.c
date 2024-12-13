@@ -1,3 +1,5 @@
+// this only checks that chdir works.
+// it cannot be used as a system utility.
 
 // in fs/file1206.h
 #define O_READ 0x1
@@ -32,13 +34,28 @@ extern void sys_print(const char *s, unsigned long len);
 extern int sys_open(const char *s, int flags);
 extern int sys_close(int fd);
 extern int sys_readdir(int fd, DirEntry *buf);
+extern int sys_chdir(const char *path);
 static void list(const char *path);
 
 int main(int argc, char **argv) 
 {
-    for (int i = 1; i < argc; i++) {
-        list(argv[i]);
+    if (sys_chdir("/home") != 0) {
+        sys_print("chdir FAIL", 10);
+        return 1;
     }
+
+    // check some corner cases!
+    if (sys_chdir("./README.txt") == 0) {
+        sys_print("chdir should FAIL", 17);
+        return 1;
+    }
+
+    list("./");
+    if (sys_chdir("../../../../") != 0) {
+        sys_print("chdir FAIL", 10);
+        return 1;
+    }
+    list(".");
     return 0;
 }
 

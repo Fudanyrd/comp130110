@@ -83,5 +83,12 @@ typedef struct {
     usize block_no[LOG_MAX_SIZE];
 } LogHeader;
 
+typedef struct device {
+    // read function
+    isize (*read)(u8 *dest, usize count);
+    // write function
+    isize (*write)(u8 *src, usize count);
+} Device;
+
 // mkfs only
 #define FSSIZE 1000 // Size of file system in blocks

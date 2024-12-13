@@ -35,3 +35,27 @@ void uart_put_char(char c)
 }
 
 __attribute__((weak, alias("uart_put_char"))) void putch(char);
+
+isize uart_read(u8 *dst, usize count)
+{
+    char *d = (char *)dst;
+    for (usize i = 0; i < count; ) {
+        *d = uart_get_char();
+        if (*d == '\n') {
+            return i;
+        }
+    }
+
+    return count;
+}
+
+isize uart_write(u8 *src, usize count)
+{
+    char *d = (char *)src;
+    for (usize i = 0; i < count; i++) {
+        uart_put_char(*d);
+        d++;
+    }
+
+    return count;
+}

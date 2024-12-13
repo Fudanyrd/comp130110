@@ -1,7 +1,6 @@
 .globl main
 .globl _start
 _start:
-    mov sp, x0
     ldr x0, [sp, #0]
     mov x1, sp 
     add x1, x1, #8
@@ -24,5 +23,65 @@ sys_open:
 .globl sys_close
 sys_close:
     mov w8, #3
+    svc #0
+    ret
+
+.globl sys_readdir
+sys_readdir:
+    mov w8, #4
+    svc #0
+    ret
+
+.globl sys_read 
+sys_read:
+    mov w8, #5
+    svc #0
+    ret
+
+.globl sys_chdir
+sys_chdir:
+    mov w8, #6
+    svc #0
+    ret
+
+.globl sys_mkdir
+sys_mkdir:
+    mov w8, #7
+    svc #0
+    ret
+
+.globl sys_write
+sys_write:
+    mov w8, #8
+    svc #0
+    ret
+
+.globl sys_unlink
+sys_unlink:
+    mov w8, #9
+    svc #0
+    ret
+
+.globl sys_fork
+sys_fork:
+    mov w8, #10
+    svc #0
+    ret
+
+.globl sys_exit
+sys_exit:
+    mov w8, #11
+    svc #0
+    ret
+
+.globl sys_wait
+sys_wait:
+    mov w8, #12
+    svc #0
+    ret
+
+.globl sys_execve
+sys_execve:
+    mov w8, #13
     svc #0
     ret

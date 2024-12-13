@@ -2,10 +2,15 @@
 #include <fs/file1206.h>
 #include <kernel/mem.h>
 #include <kernel/pt.h>
+#include <kernel/proc.h>
 #include <common/string.h>
 
-// see aarch64/trap.S.
-extern void fork_return(u64 sp, u64 elr, u64 spsr);
+// aarch64/trap.S
+extern void trap_return(u64);
+// kernel/proc.c
+extern int start_with_kcontext(Proc *p);
+// kernel/sched.c
+extern void proc_entry(void (*entry)(u64), u64 arg);
 
 /** Install the section into page table.
  * @return 0 on success. 
@@ -15,9 +20,15 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe);
 extern int exec(const char *path, char **argv)
 {
     File *exe = fopen(path, F_READ);
+    if (exe == NULL) {
+        // no such file
+        return -1;
+    }
+
     ASSERT(argv != NULL);
     Proc *proc = thisproc();
     struct pgdir *pd = &proc->pgdir;
+    free_pgdir(pd);
 
     Elf64_Ehdr *ehdr = kalloc(sizeof(Elf64_Ehdr));
     if (ehdr == NULL) {
@@ -53,10 +64,17 @@ extern int exec(const char *path, char **argv)
     void *stkpg = kalloc_page();
     *entr = K2P(stkpg) | PTE_USER_DATA;
 
+    // add the stack area in pgdir.
+    struct section *sec = kalloc(sizeof(struct section));
+    sec->flags = 0;
+    sec->npages = 1;
+    sec->start = (u64)(STACK_START - PAGE_SIZE);
+    pgdir_add_section(pd, sec);
+    sec = NULL; // avoid modification
+
     // setup a user context for trap_return.
     UserContext *ctx = proc->ucontext;
     memset(ctx, 0, sizeof(*ctx));
-    ctx->elr = ehdr->e_entry;
     // see aarch64/trap.S for why set x0 to this val.
     // ctx->spsr = 0;
 
@@ -95,8 +113,10 @@ extern int exec(const char *path, char **argv)
     *(u64 *)sp = narg;
     // must align to 16 bytes.
     ASSERT((u64) sp % 0x10 == 0);
-    // set x0, sp to the current pointer.
-    ctx->sp = ctx->x0 = STACK_START - PAGE_SIZE + (sp - (char *)stkpg);
+    // set sp to the current pointer.
+    ctx->sp = STACK_START - PAGE_SIZE + (sp - (char *)stkpg);
+    // set elr to the executable entry.
+    ctx->elr = ehdr->e_entry;
 
     // free allocated resources.
     kfree(ehdr);
@@ -132,11 +152,46 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
 
     // protection
     PTEntry prot = PTE_USER_DATA;
-    void *start = addr_round_down(ph->p_vaddr, ph->p_align); 
-    start = addr_round_down((u64)start, PAGE_SIZE);
+    void *start = addr_round_down(ph->p_vaddr, PAGE_SIZE); 
     void *end = addr_round_up(ph->p_vaddr + ph->p_memsz, PAGE_SIZE);
+
+    // record in the proc's pgdir.
+    struct section *sec = kalloc(sizeof(struct section));
+    sec->flags = 0;
+    sec->npages = (end - start) / PAGE_SIZE;
+    sec->start = (u64)start;
+    pgdir_add_section(pd, sec);
+    sec = NULL; // avoid further modification
+
     isize offset = ph->p_offset;
     isize nread = ph->p_filesz;
+
+    // load the first page, must read from file.
+    if (start < end && nread > 0) {
+        PTEntry *entr = get_pte(pd, (u64)start, true);
+        if (entr == NULL) {
+            goto install_bad;
+        }
+
+        // set the page to 0.
+        void *pg = kalloc_page();
+        memset(pg, 0, PAGE_SIZE);
+
+        // read from file
+        ASSERT(fseek(exe, offset, S_SET) == offset);
+        // tmp = min(4096 - vaddr % 4096, nread);
+        isize tmp = PAGE_SIZE - ph->p_vaddr % PAGE_SIZE;
+        tmp = tmp > nread ? nread : tmp;
+        fread(exe, (char *)pg + ph->p_vaddr % PAGE_SIZE, tmp);
+
+        // install the page
+        *entr = K2P(pg) | PTE_USER_DATA;
+
+        // advance.
+        start += PAGE_SIZE;
+        offset += tmp;
+        nread -= tmp;
+    }
 
     for (; start < end; start += PAGE_SIZE) {
         // map the page
@@ -168,4 +223,47 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
     return 0;
 install_bad:
     return -1;
+}
+
+// fork implementation that makes parent runs first.
+int fork()
+{
+    Proc *child = create_proc();
+    if (child == NULL) {
+        // fail
+        return -1;
+    }
+    Proc *proc = thisproc();
+
+    // set parent-child relationship
+    set_parent_to_this(child);
+
+    // copy the page dir.
+    pgdir_clone(&child->pgdir, &proc->pgdir);
+
+    // user context, child's return val is 0.
+    ASSERT(child->kstack != NULL && proc->ucontext != NULL);
+    UserContext *ctx = (UserContext *)(child->kstack + 
+                                       PAGE_SIZE - sizeof(UserContext));
+    memcpy(ctx, proc->ucontext, sizeof(UserContext));
+    ctx->x0 = 0;
+
+    // inherent the parent's cwd.
+    child->cwd = inodes.share(proc->cwd);
+
+    // FIXME: inherent the parent's 
+    // open file table!
+    for (int i = 0; i < MAXOFILE; i++) {
+        child->ofile.ofile[i] = fshare(proc->ofile.ofile[i]);
+    }
+
+    // start the child proc.
+    memset(&child->kcontext, 0, sizeof(child->kcontext));
+    child->kcontext.x0 = (u64)trap_return;
+    child->kcontext.lr = (uintptr_t)proc_entry;
+    child->kcontext.sp = (u64)ctx;
+    start_with_kcontext(child);
+
+    // THINK: what is the return value?
+    return child->pid;
 }

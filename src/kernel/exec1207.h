@@ -110,5 +110,6 @@ typedef struct
 } Elf64_Phdr;
 
 extern int exec(const char *path, char **argv);
+extern int fork();
 
 #endif // _KERNEL_EXEC_

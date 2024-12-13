@@ -127,3 +127,4 @@ int start_proc(Proc *, void (*entry)(u64), u64 arg);
 NO_RETURN void exit(int code);
 WARN_RESULT int wait(int *exitcode);
 WARN_RESULT int kill(int pid);
+void set_parent_to_this(Proc *proc);

@@ -17,12 +17,16 @@
 #define F_WRITE 0x2
 #define F_CREATE 0x4
 
+// maximum number of file can open by a proc.
+#define MAXOFILE (16)
+
 extern BlockDevice block_device;
 extern BlockCache bcache;
 extern InodeTree inodes;
 
 // initialize file system, should enable intr.
 extern void fs_init();
+extern void init_devices(void);
 
 /*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *                        Data Structures
@@ -54,12 +58,20 @@ typedef struct file {
     // offset of the file in bytes.
     // For a pipe, it is the number of bytes that have been written/read.
     usize off;
+
+    // reviewer may be concerned about concurrent access to 
+    // off and ref. But we ensure that must hold inode's lock when
+    // accessing off. Others like pipe and socket is not seekable,
+    // so off is not used.
 } File;
 
 // Opended file by a process
 struct oftable {
-    struct file *ofile[16];
+    struct file *ofile[MAXOFILE];
 };
+
+// console device(r,w)
+extern File *console;
 
 /*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *                          File Syscalls
@@ -76,8 +88,8 @@ int sys_open(const char *path, int flags);
 
 int sys_close(int fd);
 
-int sys_read(int fd, char *buf, usize count);
-int sys_write(int fd, char *buf, usize count);
+isize sys_read(int fd, char *buf, usize count);
+isize sys_write(int fd, char *buf, usize count);
 
 /** Read an dir entry into user buffer. */
 int sys_readdir(int fd, char *buf);
@@ -85,6 +97,11 @@ int sys_readdir(int fd, char *buf);
 /** Returns a duplicate fd. */
 int sys_dup(int fd);
 int sys_dup2(int oldfd, int newfd);
+
+/** Link/Unlink */
+
+int sys_link(const char *src, const char *target);
+int sys_unlink(const char *target);
 
 /*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *                          File Backends
@@ -108,3 +125,6 @@ isize fseek(File *fobj, isize bias, int flag);
 isize fread(File *fobj, char *buf, u64 count);
 
 isize fwrite(File* fobj, char* addr, isize n);
+
+/** Share a file object, will have the same offset. */
+File *fshare(File *src);
