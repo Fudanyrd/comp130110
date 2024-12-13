@@ -5,6 +5,9 @@
 
 #define IS_KERNEL_ADDR(addr) (((u64)addr & 0xFFFF000000000000) == 0xFFFF000000000000)
 
+/** Maximum number of syscall arguments */
+#define EXE_MAX_ARGS 16
+
 /**
  * @param ka kernel virtual address as dst
  * @param va user virtual address, provided in user context

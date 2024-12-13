@@ -10,6 +10,8 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Woverride-init"
 
+extern int exec(const char *path, char **argv);
+
 /** Syscall executor type */
 typedef void (*syscall_fn)(UserContext *);
 
@@ -25,6 +27,7 @@ void syscall_unlink(UserContext *ctx);
 void syscall_fork(UserContext *ctx);
 void syscall_exit(UserContext *ctx);
 void syscall_wait(UserContext *ctx);
+void syscall_execve(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -42,7 +45,8 @@ void *syscall_table[NR_SYSCALL] = {
     [10] = (void *)syscall_fork,
     [11] = (void *)syscall_exit,
     [12] = (void *)syscall_wait,
-    [13 ... NR_SYSCALL - 1] = NULL,
+    [13] = (void *)syscall_execve,
+    [14 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -444,6 +448,71 @@ void syscall_wait(UserContext *ctx)
         copyout(&thisproc()->pgdir, &code, ctx->x0, sizeof(code));
     }
     ctx->x0 = pid;
+}
+
+void syscall_execve(UserContext *ctx)
+{
+    struct pgdir *pd = &thisproc()->pgdir;
+    // return value 
+    int ret = 0;
+    // name of executable
+    char *ename = kalloc_page();
+    if (ename == NULL) {
+        ret = -1;
+        goto exe_bad;
+    }
+    if (copyinstr(pd, ename, ctx->x0) != 0) {
+        ret = -1;
+        goto exe_bad2;
+    }
+
+    // zero-init argv array
+    char **argv = kalloc(EXE_MAX_ARGS * sizeof(void *));
+    if (argv == NULL) {
+        ret = -1;
+        goto exe_bad2;
+    }
+    for (int i = 0; i < EXE_MAX_ARGS; i++) {
+        argv[i] = NULL;
+    }
+
+    // copy argv from user space
+    u64 narg = 0;
+    for (u64 va = ctx->x1; ;va += sizeof(void *)) {
+        u64 uvaddr;
+        if (copyin(pd, (void *)&uvaddr, va, sizeof(uvaddr)) != 0) {
+            ret = -1;
+            goto exe_bad1;
+        }
+        if (uvaddr == NULL) {
+            // end
+            break;
+        }
+
+        // copy string from user
+        argv[narg] = kalloc_page();
+        if (argv[narg] == NULL || copyinstr(pd, argv[narg], uvaddr) != 0) {
+            ret = -1;
+            goto exe_bad1;
+        }
+
+        narg++;
+    }
+
+    // execute command.
+    ret = exec(ename, argv);
+
+// free up resources.
+exe_bad1:
+    for (int i = 0; argv[i] != NULL; i++) {
+        kfree_page(argv[i]);
+    }
+    kfree(argv);
+exe_bad2:
+    kfree_page(ename);
+exe_bad: 
+    ctx->x0 = ret;
+    return;
 }
 
 #pragma GCC diagnostic pop
