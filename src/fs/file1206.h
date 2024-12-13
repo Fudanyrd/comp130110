@@ -26,6 +26,7 @@ extern InodeTree inodes;
 
 // initialize file system, should enable intr.
 extern void fs_init();
+extern void init_devices(void);
 
 /*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *                        Data Structures
@@ -68,6 +69,9 @@ typedef struct file {
 struct oftable {
     struct file *ofile[MAXOFILE];
 };
+
+// console device(r,w)
+extern File *console;
 
 /*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *                          File Syscalls

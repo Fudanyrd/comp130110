@@ -12,6 +12,9 @@
 
 volatile bool panic_flag;
 
+extern isize uart_write(u8 *src, usize count);
+extern char uart_get_char();
+
 NO_RETURN void idle_entry()
 {
     set_cpu_on();
@@ -41,11 +44,28 @@ NO_RETURN void kernel_entry()
 
     ASSERT(inodes.root->valid);
 
+    Proc *proc = thisproc();
+
     // init proc runs at root dir.
-    thisproc()->cwd = inodes.share(inodes.root);
+    proc->cwd = inodes.share(inodes.root);
     // setup a usercontext on stack.
     UserContext ctx;
-    thisproc()->ucontext = &ctx;
+    proc->ucontext = &ctx;
+
+    // initialize device tree
+    init_devices();
+    const char *boot = "rpi-os starting.\n";
+    uart_write((u8 *)boot, 18);
+
+    // open stdin, stdout and stderr
+    File *stdin = fopen("/dev/console", F_READ);
+    ASSERT(stdin != NULL);
+    proc->ofile.ofile[0] = stdin;
+    File *stdout = fopen("/dev/console", F_WRITE);
+    File *stderr = fshare(stdout);
+    ASSERT(stdout != NULL);
+    proc->ofile.ofile[1] = stdout;
+    proc->ofile.ofile[1] = stderr;
 
     char *argv[] = {
         "/init", ".", "/", "/init", NULL

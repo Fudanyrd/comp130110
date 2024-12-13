@@ -41,6 +41,9 @@ static SpinLock lock;
 static ListNode head;
 static ListNode tail;
 
+/** 8 devices should suffice. */
+Device devices[8];
+
 // push an inode into list. Must hold lock.
 static INLINE void inode_push_lst(Inode *ino)
 {
@@ -264,6 +267,11 @@ static void inode_unlock(Inode *inode)
  */
 static void inode_sync(OpContext *ctx, Inode *inode, bool do_write)
 {
+    if (inode->entry.type == INODE_DEVICE) {
+        // a device, do nothing and return.
+        return;
+    }
+
     // TODO
     ASSERT(inode->inode_no != 0);
     if (do_write) {
@@ -630,6 +638,14 @@ bad_ctx:
 static usize inode_read(Inode *inode, u8 *dest, usize offset, usize count)
 {
     InodeEntry *entry = &inode->entry;
+
+    // specially deal with device entry.
+    if (entry->type == INODE_DEVICE) {
+        // lookup device table.
+        ASSERT((void *)devices[entry->minor].read != NULL);
+        return devices[entry->minor].read(dest, count);
+    }
+
     if (count + offset > entry->num_bytes)
         count = entry->num_bytes - offset;
     usize end = offset + count;
@@ -711,6 +727,14 @@ static usize inode_write(OpContext *ctx, Inode *inode, u8 *src, usize offset,
                          usize count)
 {
     InodeEntry *entry = &inode->entry;
+
+    // specially deal with device entry.
+    if (entry->type == INODE_DEVICE) {
+        // lookup device table.
+        ASSERT((void *)devices[entry->minor].write != NULL);
+        return devices[entry->minor].write(src, count);
+    }
+
     usize end = offset + count;
     ASSERT(offset <= entry->num_bytes);
     ASSERT(end <= INODE_MAX_BYTES);

@@ -5,6 +5,49 @@
 #include <kernel/sched.h>
 #include <kernel/syscall.h>
 
+extern isize uart_read(u8 *dst, usize count);
+extern isize uart_write(u8 *src, usize count);
+extern Device devices[8];
+
+// console device, may be used by a lot of progs
+File *console;
+
+void init_devices()
+{
+    // initialize devices
+    sys_mkdir("/dev");
+    File *devdir = fopen("/dev", F_READ);
+    if (devdir == NULL) {
+        printk("create /dev FAIL\n");
+        PANIC();
+    }
+
+    // make a device named uart.
+    Device uart;
+    uart.read = uart_read;
+    uart.write = uart_write;
+    devices[0] = uart;
+
+    File *fuart = fopen("/dev/console", F_READ | F_WRITE | F_CREATE);
+    if (fuart == NULL) {
+        printk("cannot create console\n");
+        PANIC();
+    }
+
+    // mark it as cannot remove, (pinned)
+    Inode *iuart = fuart->ino;
+    iuart->entry.type = INODE_DEVICE;
+    iuart->entry.num_links = 4096;
+    iuart->entry.num_bytes = -1; // max bytes
+    iuart->entry.minor = 0;
+    iuart->rc.count = 4096;
+
+    // do not sync. It does nothing for a device.
+
+    console = fuart;
+    fclose(devdir);
+}
+
 /** 
  * WARNING:
  * NAME OF THIS FILE IS RANDOMIZED TO AVOID FUTURE GIT MERGE COLLISION! 
@@ -232,7 +275,7 @@ static inline isize file_read(File *fobj, char *buf, u64 count)
 {
     Inode *ino = fobj->ino;
 
-    if (ino->entry.type != INODE_REGULAR) {
+    if (ino->entry.type != INODE_REGULAR && ino->entry.type != INODE_DEVICE) {
         // not a valid file
         return -1;
     }
@@ -340,6 +383,15 @@ static INLINE isize file_write_safe(OpContext *ctx, File *fobj, char *addr,
 static isize fino_write(File *fobj, char *addr, isize n)
 {    
     Inode *ino = fobj->ino;
+
+    // treat device somewhat differently
+    if (ino->entry.type == INODE_DEVICE) {
+        inodes.lock(ino);
+        isize ret = inodes.write(NULL, ino, (u8 *)addr, 0, n);
+        inodes.unlock(ino);
+        return ret;
+    }
+
     OpContext *ctx = kalloc(sizeof(OpContext));
     if (ctx == NULL) {
         // bad
