@@ -67,3 +67,9 @@ sys_fork:
     mov w8, #10
     svc #0
     ret
+
+.globl sys_exit
+sys_exit:
+    mov w8, #11
+    svc #0
+    ret

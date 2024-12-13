@@ -22,6 +22,9 @@ int main(int argc, char **argv) {
             buf[0] = 'p';
             sys_print(buf, 1);
         }
+
+        // child exit.
+        sys_exit(0);
     } else {
         sys_print("from parent", 11);
     }

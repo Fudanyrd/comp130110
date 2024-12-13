@@ -60,5 +60,6 @@ extern int sys_mkdir(const char *dirname);
 extern isize sys_write(int fd, const char *buf, unsigned long size);
 extern int sys_unlink(const char *path);
 extern int sys_fork();
+extern int sys_exit(int code);
 
 #endif // _USER_SYSCALL_

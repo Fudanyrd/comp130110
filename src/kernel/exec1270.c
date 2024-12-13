@@ -20,9 +20,15 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe);
 extern int exec(const char *path, char **argv)
 {
     File *exe = fopen(path, F_READ);
+    if (exe == NULL) {
+        // no such file
+        return -1;
+    }
+
     ASSERT(argv != NULL);
     Proc *proc = thisproc();
     struct pgdir *pd = &proc->pgdir;
+    free_pgdir(pd);
 
     Elf64_Ehdr *ehdr = kalloc(sizeof(Elf64_Ehdr));
     if (ehdr == NULL) {
@@ -242,8 +248,14 @@ int fork()
     memcpy(ctx, proc->ucontext, sizeof(UserContext));
     ctx->x0 = 0;
 
+    // inherent the parent's cwd.
+    child->cwd = inodes.share(proc->cwd);
+
     // FIXME: inherent the parent's 
     // open file table!
+    for (int i = 0; i < MAXOFILE; i++) {
+        child->ofile.ofile[i] = fshare(proc->ofile.ofile[i]);
+    }
 
     // start the child proc.
     memset(&child->kcontext, 0, sizeof(child->kcontext));

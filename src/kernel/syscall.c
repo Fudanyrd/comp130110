@@ -23,6 +23,7 @@ void syscall_mkdir(UserContext *ctx);
 void syscall_write(UserContext *ctx);
 void syscall_unlink(UserContext *ctx);
 void syscall_fork(UserContext *ctx);
+void syscall_exit(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -38,7 +39,8 @@ void *syscall_table[NR_SYSCALL] = {
     [8] = (void *)syscall_write,
     [9] = (void *)syscall_unlink,
     [10] = (void *)syscall_fork,
-    [11 ... NR_SYSCALL - 1] = NULL,
+    [11] = (void *)syscall_exit,
+    [12 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -406,6 +408,29 @@ void syscall_fork(UserContext *ctx)
 {
     ctx->x0 = fork();
     return;
+}
+
+void syscall_exit(UserContext *ctx)
+{
+    extern Proc root_proc;
+    Proc *proc = thisproc();
+    if (proc == &root_proc) {
+        // root exit. ?
+        PANIC();
+    }
+
+    // release its current working dir.
+    inodes.put(NULL, proc->cwd);
+
+    // release its file descriptors.
+    for (int i = 0; i < MAXOFILE; i++) {
+        File *fobj = proc->ofile.ofile[i];
+        if (fobj != NULL) {
+            fclose(fobj);
+        }
+    }
+
+    exit(ctx->x0);
 }
 
 #pragma GCC diagnostic pop
