@@ -9,7 +9,7 @@ fi
 
 build=../../../build
 uprog=echo
-tests="chdir exec fork fstest23 ls mkdir wait write"
+tests="cat chdir exec fork fstest23 ls mkdir wait write"
 cflags="-static -ffreestanding -O3 -fno-plt -fno-pic -mgeneral-regs-only"
 
 echo "Building start.o..."
