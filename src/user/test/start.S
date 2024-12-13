@@ -79,3 +79,9 @@ sys_wait:
     mov w8, #12
     svc #0
     ret
+
+.globl sys_execve
+sys_execve:
+    mov w8, #13
+    svc #0
+    ret

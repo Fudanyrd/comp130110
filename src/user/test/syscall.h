@@ -5,6 +5,8 @@
 #define O_WRITE 0x2
 #define O_CREATE 0x4
 
+#define NULL ((void *)0x0)
+
 // in common/defines.h
 typedef signed char i8;
 typedef unsigned char u8;
@@ -62,5 +64,6 @@ extern int sys_unlink(const char *path);
 extern int sys_fork();
 extern int sys_exit(int code);
 extern int sys_wait(int *exitcode);
+extern int sys_execve(const char *exe, char **argv);
 
 #endif // _USER_SYSCALL_
