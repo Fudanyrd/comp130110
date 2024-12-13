@@ -45,6 +45,11 @@ isize uart_read(u8 *dst, usize count)
             continue;
         }
 
+        // EOF
+        if (*d == (char)4) {
+            return 0;
+        }
+
         if (*d == (char)127) {
             // backspace
             uart_put_char('\b');
