@@ -64,7 +64,7 @@ NO_RETURN void kernel_entry()
     File *stderr = fshare(stdout);
     ASSERT(stdout != NULL);
     proc->ofile.ofile[1] = stdout;
-    proc->ofile.ofile[1] = stderr;
+    proc->ofile.ofile[2] = stderr;
 
     char *argv[] = {
         "/init", NULL
