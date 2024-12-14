@@ -58,6 +58,15 @@ extern int exec(const char *path, char **argv)
             }
         }
     }
+    
+    // map the space for heap
+    // alloc lazily. Do not do mapping.
+    struct section *heap = kalloc(sizeof(struct section));
+    heap->flags = 0;
+    heap->npages = 0;
+    heap->start = round_up(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
+    pgdir_add_section(pd, heap);
+    pd->heap = heap;
 
     // map the space for stack.
     PTEntry *entr = get_pte(pd, STACK_START - PAGE_SIZE, true);

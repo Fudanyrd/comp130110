@@ -31,6 +31,7 @@ void syscall_execve(UserContext *ctx);
 void syscall_fstat(UserContext *ctx);
 void syscall_pipe(UserContext *ctx);
 void syscall_dup2(UserContext *ctx);
+void syscall_sbrk(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -52,7 +53,8 @@ void *syscall_table[NR_SYSCALL] = {
     [14] = (void *)syscall_fstat,
     [15] = (void *)syscall_pipe,
     [16] = (void *)syscall_dup2,
-    [17 ... NR_SYSCALL - 1] = NULL,
+    [17] = (void *)syscall_sbrk,
+    [18 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -627,6 +629,45 @@ void syscall_dup2(UserContext *ctx)
     }
     ofiles[after] = fshare(ofiles[before]);
     ctx->x0 = 0;
+    return;
+}
+
+// returns the brk after growth.
+void syscall_sbrk(UserContext *ctx)
+{
+    // note:
+    // void *sbrk(i64 size);
+    isize grow = ctx->x0;
+    struct pgdir *pd = &thisproc()->pgdir;
+    struct section *heap = pd->heap;
+    u64 start = heap->start + heap->npages * PAGE_SIZE;
+
+    if (grow <= 0) {
+        ctx->x0 = start;
+        return;
+    }
+
+    u64 end = round_up(start + grow, PAGE_SIZE);
+    for (; start < end; start += PAGE_SIZE) {
+        // install a page at virtual address start.
+        void *page = kalloc_page();
+        if (page == NULL) {
+            // cannot alloc
+            break;
+        }
+        memset(page, 0, PAGE_SIZE);
+
+        // install page
+        PTEntry *pte = get_pte(pd, start, true);
+        *pte = K2P(page);
+        *pte |= PTE_USER_DATA;
+
+        // advance.
+        heap->npages++;
+    }
+
+    ctx->x0 = heap->start + heap->npages * PAGE_SIZE;
+    arch_tlbi_vmalle1is();
     return;
 }
 
