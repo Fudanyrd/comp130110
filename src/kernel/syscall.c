@@ -29,6 +29,8 @@ void syscall_exit(UserContext *ctx);
 void syscall_wait(UserContext *ctx);
 void syscall_execve(UserContext *ctx);
 void syscall_fstat(UserContext *ctx);
+void syscall_pipe(UserContext *ctx);
+void syscall_dup2(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -48,7 +50,9 @@ void *syscall_table[NR_SYSCALL] = {
     [12] = (void *)syscall_wait,
     [13] = (void *)syscall_execve,
     [14] = (void *)syscall_fstat,
-    [15 ... NR_SYSCALL - 1] = NULL,
+    [15] = (void *)syscall_pipe,
+    [16] = (void *)syscall_dup2,
+    [17 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -539,6 +543,91 @@ void syscall_fstat(UserContext *ctx)
 fstat_bad:
     ctx->x0 = -1;
     return;    
+}
+
+static int alloc_fd(int start) {
+    Proc *p = thisproc();
+
+    int i = 0;
+    i = i > start ? i : start;
+    for (; i < MAXOFILE; i++) {
+        if (p->ofile.ofile[i] == NULL) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+void syscall_pipe(UserContext *ctx)
+{
+    Pipe *pip = pipe_open();
+    if (pip == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+
+    int rfd = alloc_fd(0);
+    int wfd = alloc_fd(rfd + 1);
+    if (wfd < 0) {
+        ctx->x0 = -1;
+        return;
+    }
+
+    // read pipe
+    File *rf = kalloc(sizeof(File));
+    if (rf == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+    rf->readable = true;
+    rf->writable = false;
+    rf->pipe = pip;
+    rf->ref = 1;
+    rf->type = FD_PIPE;
+
+    File *wf = kalloc(sizeof(File));
+    if (wf == NULL) {
+        fclose(rf);
+        ctx->x0 = -1;
+        return;
+    }
+    wf->readable = false;
+    wf->writable = true;
+    wf->pipe = pip;
+    wf->ref = 1;
+    wf->type = FD_PIPE;
+
+    Proc *proc = thisproc();
+    proc->ofile.ofile[rfd] = rf;
+    proc->ofile.ofile[wfd] = wf;
+
+    u64 uva = ctx->x0;
+    copyout(&proc->pgdir, &rfd, uva, sizeof(int));
+    uva += sizeof(int);
+    copyout(&proc->pgdir, &wfd, uva, sizeof(int));
+
+    ctx->x0 = 0;
+    return;
+}
+
+void syscall_dup2(UserContext *ctx)
+{
+    int before = ctx->x0;
+    int after = ctx->x1;
+
+    File **ofiles = (File **)(thisproc()->ofile.ofile);
+    if (ofiles[before] == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+
+    if (ofiles[after] != NULL) {
+        fclose(ofiles[after]);
+    }
+    ofiles[after] = fshare(ofiles[before]);
+    ctx->x0 = 0;
+    return;
 }
 
 #pragma GCC diagnostic pop

@@ -8,6 +8,7 @@
 #include <test/test.h>
 #include <fdutil/stddef.h>
 #include <fs/file1206.h>
+#include <fs/pipe.h>
 #include <kernel/exec1207.h>
 
 volatile bool panic_flag;
@@ -42,6 +43,7 @@ NO_RETURN void kernel_entry()
     // the fs is initialized here because it need 
     // some other proc to take over.
     fs_init();
+    pipe_init();
 
     ASSERT(inodes.root->valid);
 
