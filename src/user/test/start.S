@@ -85,3 +85,9 @@ sys_execve:
     mov w8, #13
     svc #0
     ret
+
+.globl sys_fstat
+sys_fstat:
+    mov w8, #14
+    svc #0
+    ret

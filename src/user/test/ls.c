@@ -53,12 +53,18 @@ static void list(const char *path)
 
     static DirEntry entry;
     while (sys_readdir(fd, &entry) == 0) {
-        sys_print(entry.name, FILE_NAME_MAX_LENGTH);
+        for (int i = 0; i < FILE_NAME_MAX_LENGTH; i++) {
+            if (entry.name[i] == 0) {
+                entry.name[i] = '\n';
+                sys_write(1, entry.name, i + 1);
+                entry.name[i] = 0;
+                break;
+            }
+        }
     }
 
     if (sys_close(fd) < 0) {
         sys_print("close FAIL", 10);
         return;
     }
-    sys_print("ls PASS", 7);
 }

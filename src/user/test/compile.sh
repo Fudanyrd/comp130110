@@ -28,6 +28,7 @@ for up in $uprog; do
     gcc $cflags -c $up.c -o $up.o && ld start.o $up.o -o $up
     if [[ $? -ne 0 ]]; then
         echo "Abort" 1>&2
+        exit 1
     fi
     mv $up $build/$up
 done
@@ -37,6 +38,7 @@ for up in $tests; do
     gcc $cflags -c $up.c -o $up.o && ld start.o $up.o -o $up
     if [[ $? -ne 0 ]]; then
         echo "Abort" 1>&2
+        exit 1
     fi
     mv $up $build/$up
 done
@@ -75,6 +77,7 @@ cat $ftmp
 ./copyin < $ftmp
 if [[ $? -ne 0 ]]; then
     echo "Abort" 1>&2
+    exit 1
 fi
 
 # hexdump -C sd.img | less
