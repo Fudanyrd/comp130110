@@ -2,6 +2,7 @@
 static void Puts(const char *s);
 extern void sys_print(const char *s, unsigned long len);
 extern long sys_write(int fd, const char *buf, unsigned long size);
+extern int sys_exit(int code);
 
 int main(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {

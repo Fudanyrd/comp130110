@@ -14,6 +14,7 @@ struct pgdir {
     PTEntriesPtr pt;
     // sections, ascending order wrt. start vaddr
     struct list sections;
+    struct section *heap;
 };
 
 void init_pgdir(struct pgdir *pgdir);

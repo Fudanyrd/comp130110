@@ -5,6 +5,11 @@
 #define O_WRITE 0x2
 #define O_CREATE 0x4
 
+#define O_RDWR (O_READ | O_WRITE)
+#define O_TRUNC 0
+#define O_RDONLY O_READ
+#define O_WRONLY O_WRITE
+
 #define NULL ((void *)0x0)
 
 // in common/defines.h
@@ -41,6 +46,32 @@ typedef u64 usize;
 
 #define DIRENTR_PER_BLOCK (BLOCK_SIZE / sizeof(DirEntry))
 
+// inode types:
+#define INODE_INVALID 0
+#define INODE_DIRECTORY 1
+#define INODE_REGULAR 2 // regular file
+#define INODE_DEVICE 3
+
+#define ROOT_INODE_NO 1
+
+typedef u16 InodeType;
+
+#define BIT_PER_BLOCK (BLOCK_SIZE * 8)
+
+// `type == INODE_INVALID` implies this inode is free.
+typedef struct dinode {
+    InodeType type;
+    u16 major; // major device id, for INODE_DEVICE only.
+    u16 minor; // minor device id, for INODE_DEVICE only.
+    u16 num_links; // number of hard links to this inode in the filesystem.
+    u32 num_bytes; // number of bytes in the file, i.e. the size of file.
+
+    /** The following is not used in user space. */
+    u32 addrs[INODE_NUM_DIRECT]; // direct addresses/block numbers.
+    u32 indirect; // the indirect address block.
+    u32 dindirect; // doubly-indirect address block
+} InodeEntry;
+
 // directory entry. `inode_no == 0` implies this entry is free.
 // the maximum length of file names, including trailing '\0'.
 #define FILE_NAME_MAX_LENGTH 14
@@ -65,5 +96,9 @@ extern int sys_fork();
 extern int sys_exit(int code);
 extern int sys_wait(int *exitcode);
 extern int sys_execve(const char *exe, char **argv);
+extern int sys_fstat(int fd, InodeEntry *buf);
+extern int sys_pipe(int *buf);
+extern int sys_dup2(int old, int new);
+extern void *sys_sbrk(isize growth);
 
 #endif // _USER_SYSCALL_

@@ -28,6 +28,10 @@ void syscall_fork(UserContext *ctx);
 void syscall_exit(UserContext *ctx);
 void syscall_wait(UserContext *ctx);
 void syscall_execve(UserContext *ctx);
+void syscall_fstat(UserContext *ctx);
+void syscall_pipe(UserContext *ctx);
+void syscall_dup2(UserContext *ctx);
+void syscall_sbrk(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -46,7 +50,11 @@ void *syscall_table[NR_SYSCALL] = {
     [11] = (void *)syscall_exit,
     [12] = (void *)syscall_wait,
     [13] = (void *)syscall_execve,
-    [14 ... NR_SYSCALL - 1] = NULL,
+    [14] = (void *)syscall_fstat,
+    [15] = (void *)syscall_pipe,
+    [16] = (void *)syscall_dup2,
+    [17] = (void *)syscall_sbrk,
+    [18 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -512,6 +520,154 @@ exe_bad2:
     kfree_page(ename);
 exe_bad: 
     ctx->x0 = ret;
+    return;
+}
+
+void syscall_fstat(UserContext *ctx)
+{
+    // hint:
+    // int fstat(int fd, InodeEntry *entry);
+    Proc *proc = thisproc();
+    File *fobj = proc->ofile.ofile[ctx->x0];
+
+    if (fobj == NULL || fobj->type != FD_INODE) {
+        goto fstat_bad;
+    }
+
+    Inode *ino = fobj->ino;
+    ASSERT(ino->valid);
+    if (copyout(&proc->pgdir, &ino->entry, ctx->x1, sizeof(InodeEntry)) != 0) {
+        goto fstat_bad;
+    }
+
+    ctx->x0 = 0;
+    return;
+fstat_bad:
+    ctx->x0 = -1;
+    return;    
+}
+
+static int alloc_fd(int start) {
+    Proc *p = thisproc();
+
+    int i = 0;
+    i = i > start ? i : start;
+    for (; i < MAXOFILE; i++) {
+        if (p->ofile.ofile[i] == NULL) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+void syscall_pipe(UserContext *ctx)
+{
+    Pipe *pip = pipe_open();
+    if (pip == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+
+    int rfd = alloc_fd(0);
+    int wfd = alloc_fd(rfd + 1);
+    if (wfd < 0) {
+        ctx->x0 = -1;
+        return;
+    }
+
+    // read pipe
+    File *rf = kalloc(sizeof(File));
+    if (rf == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+    rf->readable = true;
+    rf->writable = false;
+    rf->pipe = pip;
+    rf->ref = 1;
+    rf->type = FD_PIPE;
+
+    File *wf = kalloc(sizeof(File));
+    if (wf == NULL) {
+        fclose(rf);
+        ctx->x0 = -1;
+        return;
+    }
+    wf->readable = false;
+    wf->writable = true;
+    wf->pipe = pip;
+    wf->ref = 1;
+    wf->type = FD_PIPE;
+
+    Proc *proc = thisproc();
+    proc->ofile.ofile[rfd] = rf;
+    proc->ofile.ofile[wfd] = wf;
+
+    u64 uva = ctx->x0;
+    copyout(&proc->pgdir, &rfd, uva, sizeof(int));
+    uva += sizeof(int);
+    copyout(&proc->pgdir, &wfd, uva, sizeof(int));
+
+    ctx->x0 = 0;
+    return;
+}
+
+void syscall_dup2(UserContext *ctx)
+{
+    int before = ctx->x0;
+    int after = ctx->x1;
+
+    File **ofiles = (File **)(thisproc()->ofile.ofile);
+    if (ofiles[before] == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+
+    if (ofiles[after] != NULL) {
+        fclose(ofiles[after]);
+    }
+    ofiles[after] = fshare(ofiles[before]);
+    ctx->x0 = 0;
+    return;
+}
+
+// returns the brk after growth.
+void syscall_sbrk(UserContext *ctx)
+{
+    // note:
+    // void *sbrk(i64 size);
+    isize grow = ctx->x0;
+    struct pgdir *pd = &thisproc()->pgdir;
+    struct section *heap = pd->heap;
+    u64 start = heap->start + heap->npages * PAGE_SIZE;
+
+    if (grow <= 0) {
+        ctx->x0 = start;
+        return;
+    }
+
+    u64 end = round_up(start + grow, PAGE_SIZE);
+    for (; start < end; start += PAGE_SIZE) {
+        // install a page at virtual address start.
+        void *page = kalloc_page();
+        if (page == NULL) {
+            // cannot alloc
+            break;
+        }
+        memset(page, 0, PAGE_SIZE);
+
+        // install page
+        PTEntry *pte = get_pte(pd, start, true);
+        *pte = K2P(page);
+        *pte |= PTE_USER_DATA;
+
+        // advance.
+        heap->npages++;
+    }
+
+    ctx->x0 = heap->start + heap->npages * PAGE_SIZE;
+    arch_tlbi_vmalle1is();
     return;
 }
 

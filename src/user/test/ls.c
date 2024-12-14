@@ -32,10 +32,15 @@ extern void sys_print(const char *s, unsigned long len);
 extern int sys_open(const char *s, int flags);
 extern int sys_close(int fd);
 extern int sys_readdir(int fd, DirEntry *buf);
+extern isize sys_write(int fd, const char *buf, unsigned long size);
 static void list(const char *path);
 
 int main(int argc, char **argv) 
 {
+    if (argc == 1) {
+        list (".");
+        return 0;
+    }
     for (int i = 1; i < argc; i++) {
         list(argv[i]);
     }
@@ -53,12 +58,18 @@ static void list(const char *path)
 
     static DirEntry entry;
     while (sys_readdir(fd, &entry) == 0) {
-        sys_print(entry.name, FILE_NAME_MAX_LENGTH);
+        for (int i = 0; i < FILE_NAME_MAX_LENGTH; i++) {
+            if (entry.name[i] == 0) {
+                entry.name[i] = '\n';
+                sys_write(1, entry.name, i + 1);
+                entry.name[i] = 0;
+                break;
+            }
+        }
     }
 
     if (sys_close(fd) < 0) {
         sys_print("close FAIL", 10);
         return;
     }
-    sys_print("ls PASS", 7);
 }

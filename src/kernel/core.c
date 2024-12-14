@@ -8,12 +8,14 @@
 #include <test/test.h>
 #include <fdutil/stddef.h>
 #include <fs/file1206.h>
+#include <fs/pipe.h>
 #include <kernel/exec1207.h>
 
 volatile bool panic_flag;
 
 extern isize uart_write(u8 *src, usize count);
 extern char uart_get_char();
+extern isize uart_read(u8 *dst, usize count);
 
 NO_RETURN void idle_entry()
 {
@@ -41,6 +43,7 @@ NO_RETURN void kernel_entry()
     // the fs is initialized here because it need 
     // some other proc to take over.
     fs_init();
+    pipe_init();
 
     ASSERT(inodes.root->valid);
 
@@ -54,8 +57,6 @@ NO_RETURN void kernel_entry()
 
     // initialize device tree
     init_devices();
-    const char *boot = "rpi-os starting.\n";
-    uart_write((u8 *)boot, 18);
 
     // open stdin, stdout and stderr
     File *stdin = fopen("/dev/console", F_READ);
@@ -65,10 +66,10 @@ NO_RETURN void kernel_entry()
     File *stderr = fshare(stdout);
     ASSERT(stdout != NULL);
     proc->ofile.ofile[1] = stdout;
-    proc->ofile.ofile[1] = stderr;
+    proc->ofile.ofile[2] = stderr;
 
     char *argv[] = {
-        "/init", ".", "/", "/init", NULL
+        "/init", NULL
     };
     exec(argv[0], argv);
     

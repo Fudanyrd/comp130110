@@ -41,9 +41,35 @@ isize uart_read(u8 *dst, usize count)
     char *d = (char *)dst;
     for (usize i = 0; i < count; ) {
         *d = uart_get_char();
-        if (*d == '\n') {
+        if (*d == (char)-1) {
+            continue;
+        }
+
+        // EOF
+        if (*d == (char)4) {
+            return 0;
+        }
+
+        if (*d == (char)127) {
+            // backspace
+            uart_put_char('\b');
+            uart_put_char(' ');
+            uart_put_char('\b');
+            if (i > 0) {
+                i--; d--;
+            }
+            continue;
+        }
+
+        i++;
+        // the user should also see the printed char.
+        uart_put_char(*d);
+        if (*d == '\r') {
+            *d = '\n';
+            uart_put_char('\n');
             return i;
         }
+        d++;
     }
 
     return count;

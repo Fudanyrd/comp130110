@@ -4,9 +4,9 @@ _start:
     ldr x0, [sp, #0]
     mov x1, sp 
     add x1, x1, #8
+    # exit(main(argc, argv))
     bl main
-_loop:
-    b _loop
+    bl sys_exit
 
 .globl sys_print
 sys_print:
@@ -83,5 +83,29 @@ sys_wait:
 .globl sys_execve
 sys_execve:
     mov w8, #13
+    svc #0
+    ret
+
+.globl sys_fstat
+sys_fstat:
+    mov w8, #14
+    svc #0
+    ret
+
+.globl sys_pipe
+sys_pipe:
+    mov w8, #15
+    svc #0
+    ret
+
+.globl sys_dup2
+sys_dup2:
+    mov w8, #16
+    svc #0
+    ret
+
+.globl sys_sbrk
+sys_sbrk:
+    mov w8, #17
     svc #0
     ret
