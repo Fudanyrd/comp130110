@@ -28,6 +28,7 @@ void syscall_fork(UserContext *ctx);
 void syscall_exit(UserContext *ctx);
 void syscall_wait(UserContext *ctx);
 void syscall_execve(UserContext *ctx);
+void syscall_fstat(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -46,7 +47,8 @@ void *syscall_table[NR_SYSCALL] = {
     [11] = (void *)syscall_exit,
     [12] = (void *)syscall_wait,
     [13] = (void *)syscall_execve,
-    [14 ... NR_SYSCALL - 1] = NULL,
+    [14] = (void *)syscall_fstat,
+    [15 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -513,6 +515,30 @@ exe_bad2:
 exe_bad: 
     ctx->x0 = ret;
     return;
+}
+
+void syscall_fstat(UserContext *ctx)
+{
+    // hint:
+    // int fstat(int fd, InodeEntry *entry);
+    Proc *proc = thisproc();
+    File *fobj = proc->ofile.ofile[ctx->x0];
+
+    if (fobj == NULL || fobj->type != FD_INODE) {
+        goto fstat_bad;
+    }
+
+    Inode *ino = fobj->ino;
+    ASSERT(ino->valid);
+    if (copyout(&proc->pgdir, &ino->entry, ctx->x1, sizeof(InodeEntry)) != 0) {
+        goto fstat_bad;
+    }
+
+    ctx->x0 = 0;
+    return;
+fstat_bad:
+    ctx->x0 = -1;
+    return;    
 }
 
 #pragma GCC diagnostic pop
