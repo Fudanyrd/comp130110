@@ -85,6 +85,7 @@ void pipe_close_read(Pipe *p)
             release_spinlock(&p->lock);
         }
     }
+    release_spinlock(&p->lock);
 }
 
 void pipe_close_write(Pipe *p)
@@ -106,6 +107,7 @@ void pipe_close_write(Pipe *p)
             release_spinlock(&p->lock);
         }
     }
+    release_spinlock(&p->lock);
 }
 
 isize pipe_read(Pipe *p, char *buf, usize count)
