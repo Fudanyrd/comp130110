@@ -60,17 +60,12 @@ void fs_init()
     const SuperBlock *sb = get_super_block();
     init_bcache(sb, &block_device);
     init_inodes(sb, &bcache);
+    // ERROR: must hold the lock.
+    inodes.lock(inodes.root);
     inodes.sync(NULL, inodes.root, false);
+    inodes.unlock(inodes.root);
     ASSERT(inodes.root->valid);
     ASSERT(inodes.root->inode_no == ROOT_INODE_NO);
-}
-
-/** Initialize an inode. Must not hold lock. */
-static inline void init_dir(Inode *ino)
-{
-    inodes.sync(NULL, ino, false);
-    memset(&ino->entry, 0, sizeof(ino->entry));
-    ino->entry.num_links = 0x1;
 }
 
 /** Walk on the directory tree.
@@ -110,7 +105,9 @@ static Inode *walk(Inode *start, const char *path, char *buf)
         return NULL;
     } else {
         next = inodes.get(nextno);
+        inodes.lock(next);
         inodes.sync(NULL, next, false);
+        inodes.unlock(next);
         ASSERT(next->valid);
     }
 
@@ -133,7 +130,9 @@ static Inode *touch_here(Inode *start, const char *path)
     // alloc an inode for file
     usize no = inodes.alloc(ctx, INODE_REGULAR);
     Inode *next = inodes.get(no);
+    inodes.lock(next);
     inodes.sync(ctx, next, false);
+    inodes.unlock(next);
     ASSERT(next->valid);
     inodes.lock(start);
     if (inodes.insert(ctx, start, path, no) == (usize)-1) {
@@ -143,17 +142,19 @@ static Inode *touch_here(Inode *start, const char *path)
 
     // increment number of links
     start->entry.num_links++;
+    inodes.sync(ctx, start, true);
     inodes.unlock(start);
 
     // init the file.
     inodes.lock(next);
-    init_dir(next);
+    inodes.sync(NULL, next, false);
+    memset(&next->entry, 0, sizeof(next->entry));
+    next->entry.num_links = 0x1;
     next->entry.type = INODE_REGULAR;
+    inodes.sync(ctx, next, true);
     inodes.unlock(next);
 
     // done.
-    inodes.sync(ctx, next, true);
-    inodes.sync(ctx, start, true);
     inodes.put(ctx, start);
     bcache.end_op(ctx);
     kfree(ctx);
@@ -231,7 +232,9 @@ File *fopen(const char *path, int flags)
         ASSERT(fino->entry.num_links == 1);
     } else {
         fino = inodes.get(no);
+        inodes.lock(fino);
         inodes.sync(NULL, fino, false);
+        inodes.unlock(fino);
         inodes.put(NULL, ino);
     }
     ASSERT(fino->valid);
@@ -325,7 +328,9 @@ isize fseek(File *fobj, isize bias, int flag)
     }
     if (!fobj->ino->valid) {
         // load from disk
+        inodes.lock(fobj->ino);
         inodes.sync(NULL, fobj->ino, false);
+        inodes.unlock(fobj->ino);
     }
 
     isize ret;
@@ -399,7 +404,9 @@ static isize fino_write(File *fobj, char *addr, isize n)
     }
 
     if (!ino->valid) {
+        inodes.lock(ino);
         inodes.sync(ctx, ino, false);
+        inodes.unlock(ino);
     }
     if (ino->entry.type != INODE_REGULAR) {
         // not a regular file
@@ -536,10 +543,10 @@ int sys_mkdir(const char *path)
     // create a directory.
     u64 dirno = inodes.alloc(ctx, INODE_DIRECTORY);
     Inode *dir = inodes.get(dirno);
-    inodes.sync(ctx, dir, false);
 
     // initialize the directory's inode.
     inodes.lock(dir);
+    inodes.sync(ctx, dir, false);
     memset((void *)&dir->entry, 0, sizeof(dir->entry));
     dir->entry.num_links = 1;
     dir->entry.type = INODE_DIRECTORY;
@@ -547,19 +554,21 @@ int sys_mkdir(const char *path)
     // create entry in dir
     inodes.insert(ctx, dir, ".", dirno);
     inodes.insert(ctx, dir, "..", ino->inode_no);
+    inodes.sync(ctx, dir, true);
     inodes.unlock(dir);
+    inodes.put(ctx, dir);
+    dir = NULL;
 
     // create entry in parent dir
     inodes.lock(ino);
     inodes.insert(ctx, ino, buf, dirno);
     ino->entry.num_links ++;
+    inodes.sync(ctx, ino, true);
     inodes.unlock(ino);
+    inodes.put(ctx, ino);
+    ino = NULL;
 
     // sync, release
-    inodes.sync(ctx, ino, true);
-    inodes.sync(ctx, dir, true);
-    inodes.put(ctx, ino);
-    inodes.put(ctx, dir);
     bcache.end_op(ctx);
 
     kfree(buf);
@@ -629,7 +638,9 @@ int sys_chdir(const char *path)
     Inode *dir = inodes.get(dno);
     ASSERT(dir->inode_no == dno);
     ASSERT(dir->rc.count > 0);
+    inodes.lock(dir);
     inodes.sync(NULL, dir, false);
+    inodes.unlock(dir);
     if (dir->entry.type != INODE_DIRECTORY) {
         // not a directory, fail
         // proc->cwd does not change.
@@ -664,7 +675,9 @@ int sys_readdir(int fd, char *buf)
     Inode *ino = fobj->ino;
     ASSERT(ino != NULL);
     if (!ino->valid) {
+        inodes.lock(ino);
         inodes.sync(NULL, ino, false);
+        inodes.unlock(ino);
     }
     if (ino->entry.type != INODE_DIRECTORY) {
         // invalid inode
@@ -833,7 +846,9 @@ int sys_unlink(const char *target)
 
     // targeted inode
     Inode *tgt = inodes.get(no);
+    inodes.lock(tgt);
     inodes.sync(NULL, tgt, false);
+    inodes.unlock(tgt);
     ASSERT(tgt->inode_no == no && tgt->valid);
     ASSERT(tgt->entry.num_links > 0);
 
@@ -870,25 +885,32 @@ int sys_unlink(const char *target)
 
             // parent inode of tgt
             Inode *pr = inodes.get(pno);
+            inodes.lock(pr);
             inodes.sync(ctx, pr, false);
 
             // remove the entry tgt from parent dir.
             inode_rm_entry(ctx, pr, no);
+            inodes.unlock(pr);
 
             // clean up
             inodes.put(ctx, pr);
         }
         inodes.put(ctx, ino);
     } else {
+        inodes.lock(tgt);
         tgt->entry.num_links--;
         inodes.sync(ctx, tgt, true);
+        inodes.unlock(tgt);
 
         // parent dir of tgt is ino!
+        inodes.lock(ino);
         inode_rm_entry(ctx, ino, no);
+        inodes.unlock(ino);
 
         // clean up
         inodes.put(ctx, ino);
     }
+    ino = NULL;
 
     // end op, clean up
     inodes.put(ctx, tgt);
