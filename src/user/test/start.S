@@ -103,3 +103,9 @@ sys_dup2:
     mov w8, #16
     svc #0
     ret
+
+.globl sys_sbrk
+sys_sbrk:
+    mov w8, #17
+    svc #0
+    ret

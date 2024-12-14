@@ -5,6 +5,11 @@
 #define O_WRITE 0x2
 #define O_CREATE 0x4
 
+#define O_RDWR (O_READ | O_WRITE)
+#define O_TRUNC 0
+#define O_RDONLY O_READ
+#define O_WRONLY O_WRITE
+
 #define NULL ((void *)0x0)
 
 // in common/defines.h
@@ -94,5 +99,6 @@ extern int sys_execve(const char *exe, char **argv);
 extern int sys_fstat(int fd, InodeEntry *buf);
 extern int sys_pipe(int *buf);
 extern int sys_dup2(int old, int new);
+extern void *sys_sbrk(isize growth);
 
 #endif // _USER_SYSCALL_
