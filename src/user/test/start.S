@@ -91,3 +91,15 @@ sys_fstat:
     mov w8, #14
     svc #0
     ret
+
+.globl sys_pipe
+sys_pipe:
+    mov w8, #15
+    svc #0
+    ret
+
+.globl sys_dup2
+sys_dup2:
+    mov w8, #16
+    svc #0
+    ret

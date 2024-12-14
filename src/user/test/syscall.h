@@ -92,5 +92,7 @@ extern int sys_exit(int code);
 extern int sys_wait(int *exitcode);
 extern int sys_execve(const char *exe, char **argv);
 extern int sys_fstat(int fd, InodeEntry *buf);
+extern int sys_pipe(int *buf);
+extern int sys_dup2(int old, int new);
 
 #endif // _USER_SYSCALL_
