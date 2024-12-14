@@ -2,14 +2,22 @@
 # compile all user programs and tests, then put in
 # the build directory and disk image.
 
-if [[ $# -ne 1 ]]; then 
-    echo "What test program you want to run?" 1>&2
+ls init.c
+if [[ $? -ne 0 ]]; then
+    echo "init.c not found, required."
+    exit 1
+fi
+
+ls sh.c
+if [[ $? -ne 0 ]]; then
+    echo "sh.c not found, required."
     exit 1
 fi
 
 build=../../../build
-uprog=echo
-tests="cat chdir exec fork fstest23 ls mkdir wait write"
+uprog=$( ./uprog.sh )
+home=$( ./home.sh )
+tests="init"
 cflags="-static -ffreestanding -O3 -fno-plt -fno-pic -mgeneral-regs-only"
 
 echo "Building start.o..."
@@ -33,6 +41,10 @@ for up in $tests; do
     mv $up $build/$up
 done
 
+for file in $home; do
+    link $file $build/$file
+done
+
 # clean
 rm *.o
 
@@ -44,17 +56,19 @@ cat /dev/zero | head -c 16777216 > sd.img
 
 # link mkfs tool: copyin
 ftmp=/tmp/mkfs.txt
-echo "Creatiing temp file" $ftmp
+echo "Creating copyin script" $ftmp
 
 # build these files and dirs.
-echo "w /init $1" > $ftmp
+echo "w /init init" > $ftmp
 echo "m /home 0" >> $ftmp
 echo "m /bin 0" >> $ftmp
-echo "w /home/README.txt README.txt" >> $ftmp
 
 # install all user progs
 for up in $uprog; do
-    echo "w /bin/$uprog $uprog" >> $ftmp
+    echo "w /bin/$up $up" >> $ftmp
+done
+for file in $home; do
+    echo "w /home/$file $file" >> $ftmp
 done
 
 cat $ftmp
@@ -65,3 +79,7 @@ fi
 
 # hexdump -C sd.img | less
 rm $ftmp
+
+for file in $home; do
+    rm $file
+done

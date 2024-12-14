@@ -4,9 +4,9 @@ _start:
     ldr x0, [sp, #0]
     mov x1, sp 
     add x1, x1, #8
+    # exit(main(argc, argv))
     bl main
-_loop:
-    b _loop
+    bl sys_exit
 
 .globl sys_print
 sys_print:
