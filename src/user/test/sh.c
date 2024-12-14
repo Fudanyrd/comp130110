@@ -3,7 +3,10 @@
 
 static char buf[512];
 
-static void execve(char *cmd);
+static void system(char *cmd);
+static void Execve(char *exe, char **argv);
+static int strcmp(const char *a, const char *b);
+static char *strcpy(char *dst, const char *src);
 
 int main(int argc, char **argv)
 {
@@ -12,7 +15,7 @@ int main(int argc, char **argv)
     while (nrd > 0) {
         // make this cmd as null-terminiated
         buf[nrd - 1] = 0;
-        execve(buf);
+        system(buf);
         sys_write(1, "> ", 2);
         nrd = sys_read(0, buf, sizeof(buf));
     }
@@ -21,7 +24,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-static void execve(char *cmd)
+static void system(char *cmd)
 {
     // split
     static char *argv[16];
@@ -49,17 +52,64 @@ static void execve(char *cmd)
         return;
     }
 
+    // built-in command cd
+    if (strcmp(argv[0], "cd") == 0) {
+        if (sys_chdir(argv[1]) != 0) {
+            sys_print("chdir FAIL", 10);
+        }
+        return;
+    }
+
     int id = sys_fork();
     if (id < 0) {
         // fail
         return;
     }
     if (id == 0) {
-        sys_execve(argv[0], argv);
-        sys_print("execve FAIL", 11);
-        sys_exit(1);
+        Execve(argv[0], argv);
     } else {
         // block execution
         sys_wait(&id);
     }
+}
+
+static int strcmp(const char *a, const char *b)
+{
+    int i = 0;
+    for (; a[i] != 0 && b[i] != 0; i++) {
+        if (a[i] != b[i]) {
+            return (int)a[i] - (int)b[i];
+        }
+    }
+
+    return (int)a[i] - (int)b[i];
+}
+
+// safely do execve.
+static void Execve(char *exe, char **argv)
+{
+    // search path option 0: cwd
+    sys_execve(exe, argv);
+
+    // search path option 1: /bin/
+    static char pth[64];
+    char *pt = strcpy(pth, "/bin/");
+    strcpy(pt, exe);
+    sys_execve((const char *)pth, argv);
+
+    sys_print("execve FAIL", 11);
+    sys_exit(1);
+}
+
+// Returns the dst after copy(*dst = 0).
+static char *strcpy(char *dst, const char *src)
+{
+    while (*src != 0) {
+        *dst = *src;
+        src++;
+        dst++;
+    }
+
+    *dst = 0;
+    return dst;
 }
