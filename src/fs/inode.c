@@ -271,6 +271,7 @@ static void inode_sync(OpContext *ctx, Inode *inode, bool do_write)
         // a device, do nothing and return.
         return;
     }
+    ASSERT(inode->rc.count > 0);
 
     // TODO
     ASSERT(inode->inode_no != 0);
@@ -295,6 +296,7 @@ static void inode_sync(OpContext *ctx, Inode *inode, bool do_write)
             inode->valid = true;
         }
     }
+    ASSERT(inode->entry.type <= INODE_DEVICE && inode->entry.type >= INODE_DIRECTORY);
 }
 
 // see `inode.h`.
@@ -464,15 +466,19 @@ static Inode *inode_share(Inode *inode)
 static void inode_put(OpContext *ctx, Inode *inode)
 {
     // TODO
+    ASSERT(inode->entry.type <= INODE_DEVICE && inode->entry.type >= INODE_DIRECTORY);
+    ASSERT(inode->rc.count > 0);
     decrement_rc(&inode->rc);
     if (inode->rc.count == 0) {
         if (inode->entry.num_links == 0) {
             // remove the file entirely
             // truncate the file first.
+            inodes.lock(inode);
             inode_clear(ctx, inode);
+            inodes.unlock(inode);
             inode->entry.type = INODE_INVALID;
         }
-        inode_sync(ctx, inode, true);
+        // no need to sync.
 
         // free the inode from list.
         acquire_spinlock(&lock);
