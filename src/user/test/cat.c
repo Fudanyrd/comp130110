@@ -33,7 +33,9 @@ static void cat(int fd)
     static char buf[512];
     long nrd = sys_read(fd, buf, sizeof(buf));
     while (nrd > 0) {
-        sys_write(1, buf, nrd);
+        if (sys_write(1, buf, nrd) < 0) {
+            break;
+        }
         nrd = sys_read(fd, buf, sizeof(buf));
     }
     return;
