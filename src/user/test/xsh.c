@@ -213,7 +213,7 @@ gets(char *buf, int max)
   // on this OS naturally satisfy that 
   // buf ends with '\n'.
   int cc = read(0, buf, max);
-  buf[cc - 1] = 0;
+  buf[cc] = 0;
   return buf;
 }
 

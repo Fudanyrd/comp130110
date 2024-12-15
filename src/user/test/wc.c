@@ -10,6 +10,15 @@
 
 static void printu(int fd, u32 val) {
     static char buf[16];
+
+    // corner case: val == 0!
+    if (val == 0) {
+        buf[0] = '0';
+        buf[1] = ' ';
+        sys_write(1, buf, 2);
+        return;
+    }
+
     int n = 0;
     while (val > 0) {
         buf[n++] = '0' + val % 10;
