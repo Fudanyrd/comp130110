@@ -1,6 +1,7 @@
 #include "file1206.h"
 
 #include <common/string.h>
+#include <driver/zero.h>
 #include <kernel/proc.h>
 #include <kernel/sched.h>
 #include <kernel/syscall.h>
@@ -11,6 +12,19 @@ extern Device devices[8];
 
 // console device, may be used by a lot of progs
 File *console;
+
+// create a device on this inode.
+static void inode_mknod(Inode *ino, u16 major, u16 minor) 
+{
+    inodes.lock(ino);
+    ino->entry.type = INODE_DEVICE;
+    ino->entry.num_links = 4096;
+    ino->entry.num_bytes  = -1;
+    ino->entry.minor = minor;
+    ino->entry.major = major;
+    ino->rc.count = 4096;
+    inodes.unlock(ino);
+}
 
 void init_devices()
 {
@@ -36,11 +50,33 @@ void init_devices()
 
     // mark it as cannot remove, (pinned)
     Inode *iuart = fuart->ino;
-    iuart->entry.type = INODE_DEVICE;
-    iuart->entry.num_links = 4096;
-    iuart->entry.num_bytes = -1; // max bytes
-    iuart->entry.minor = 0;
-    iuart->rc.count = 4096;
+    inode_mknod (iuart, 0, 0);
+
+    // make a zero device.
+    Device zero;
+    zero.read = zero_read;
+    zero.write = null_write;
+    devices[1] = zero;
+
+    File *fzero = fopen("/dev/zero", F_READ | F_WRITE | F_CREATE);
+    if (fzero == NULL) {
+        printk("cannot create zero\n");
+        PANIC();
+    }
+    inode_mknod (fzero->ino, 0, 1);
+
+    // make a null device
+    Device null;
+    null.read = null_read;
+    null.write = null_write;
+    devices[2] = null;
+
+    File *fnull = fopen("/dev/null", F_READ | F_WRITE | F_CREATE);
+    if (fnull == NULL) {
+        printk("cannot create null\n");
+        PANIC();
+    }
+    inode_mknod (fnull->ino, 0, 2);
 
     // do not sync. It does nothing for a device.
 
@@ -889,6 +925,8 @@ int sys_unlink(const char *target)
             inodes.sync(ctx, pr, false);
 
             // remove the entry tgt from parent dir.
+            ASSERT(pr->entry.num_links > 1);
+            pr->entry.num_links--;
             inode_rm_entry(ctx, pr, no);
             inodes.unlock(pr);
 
@@ -904,6 +942,8 @@ int sys_unlink(const char *target)
 
         // parent dir of tgt is ino!
         inodes.lock(ino);
+        ASSERT(ino->entry.num_links > 1);
+        ino->entry.num_links --;
         inode_rm_entry(ctx, ino, no);
         inodes.unlock(ino);
 
@@ -920,6 +960,8 @@ int sys_unlink(const char *target)
     return ret;
 }
 
+// inode write will sync.
+// so well this function.
 static void inode_rm_entry(OpContext *ctx, Inode *dir, usize num)
 {
     ASSERT(dir->valid);
