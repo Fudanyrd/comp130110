@@ -928,6 +928,7 @@ int sys_unlink(const char *target)
             ASSERT(pr->entry.num_links > 1);
             pr->entry.num_links--;
             inode_rm_entry(ctx, pr, no);
+            inodes.sync(ctx, pr, true);
             inodes.unlock(pr);
 
             // clean up
@@ -945,6 +946,7 @@ int sys_unlink(const char *target)
         ASSERT(ino->entry.num_links > 1);
         ino->entry.num_links --;
         inode_rm_entry(ctx, ino, no);
+        inodes.sync(ctx, ino, true);
         inodes.unlock(ino);
 
         // clean up
