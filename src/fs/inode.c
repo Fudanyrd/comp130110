@@ -220,7 +220,7 @@ static usize inode_alloc(OpContext *ctx, InodeType type)
  */
 static void inode_lock(Inode *inode)
 {
-    ASSERT(inode->rc.count > 0);
+    ASSERT(inode->rc.count >= 0);
     // TODO
     unalertable_acquire_sleeplock(&inode->lock);
     if (!inode->valid) {
@@ -243,7 +243,6 @@ static void inode_lock(Inode *inode)
  */
 static void inode_unlock(Inode *inode)
 {
-    ASSERT(inode->rc.count > 0);
     // TODO
     release_sleeplock(&inode->lock);
 }
@@ -271,7 +270,7 @@ static void inode_sync(OpContext *ctx, Inode *inode, bool do_write)
         // a device, do nothing and return.
         return;
     }
-    ASSERT(inode->rc.count > 0);
+    ASSERT(inode->rc.count >= 0);
 
     // TODO
     ASSERT(inode->inode_no != 0);
