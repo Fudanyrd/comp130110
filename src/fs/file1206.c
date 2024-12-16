@@ -923,7 +923,7 @@ static void inode_rm_entry(OpContext *ctx, Inode *dir, usize num);
 /** Unlink a file or directory */
 int sys_unlink(const char *target)
 {
-    if (*target == NULL) {
+    if (target == NULL) {
         return -1;
     }
     ASSERT(IS_KERNEL_ADDR(target));
