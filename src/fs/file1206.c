@@ -325,7 +325,7 @@ static inline isize file_read(File *fobj, char *buf, u64 count)
 
     inodes.lock(ino);
     isize ret = inodes.read(ino, (u8 *)buf, fobj->off, count);
-    fobj->off += ret;
+    fobj->off += ino->entry.type == INODE_DEVICE ? 0 : ret;
     inodes.unlock(ino);
     return ret;
 }
