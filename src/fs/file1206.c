@@ -1,5 +1,8 @@
 #include "file1206.h"
 
+#ifndef STAND_ALONE
+// these prototypes is not added to copyin, copyout
+
 #include <common/string.h>
 #include <driver/zero.h>
 #include <kernel/proc.h>
@@ -103,6 +106,92 @@ void fs_init()
     ASSERT(inodes.root->valid);
     ASSERT(inodes.root->inode_no == ROOT_INODE_NO);
 }
+
+#else
+#include <string.h>
+
+// no need to check it.
+#define IS_KERNEL_ADDR(foo) (1)
+
+static OpContext *ctx;
+static BlockCache bcache;
+
+typedef struct proc {
+    Inode *cwd;  // current working directory
+    struct oftable ofile;
+} Proc;
+
+static Proc proc;
+
+static Proc *thisproc() {
+    return &proc;
+}
+
+void file_init(OpContext *_ctx, BlockCache *_bc)
+{
+    ctx = _ctx;
+    bcache = *_bc;
+    proc.cwd = inodes.share(inodes.root);
+    inodes.share(inodes.root);
+    inodes.sync(ctx, proc.cwd, false);
+    ASSERT(proc.cwd->valid);
+}
+
+/** Returns file struct. Should use fclose to free it. */
+static File *fopen(const char *path, int flags);
+static void fclose(File *fobj);
+
+/** Returns the position after the seek. -1 if error */
+#define S_SET 0
+#define S_CUR 1
+#define S_END 2
+
+/** Seek a file.
+ * @return the offset after the seek. -1 if failure. 
+ */
+static isize fseek(File *fobj, isize bias, int flag);
+
+/** Returns num bytes read from file */
+static isize fread(File *fobj, char *buf, u64 count);
+
+static isize fwrite(File* fobj, char* addr, isize n);
+
+/** Share a file object, will have the same offset. */
+static File *fshare(File *src);
+
+int sys_create(const char *path, int flags)
+{
+    int type = flags;
+    if (type == INODE_REGULAR) {
+        File *f = fopen(path, F_CREATE | F_READ | F_WRITE);
+        fclose(f);
+        return 0;
+    }
+    if (type == INODE_DIRECTORY) {
+        return sys_mkdir(path);
+    }
+
+    // unsupported.
+    return -1;
+}
+
+int sys_inode(int fd, InodeEntry *entr)
+{
+    if (fd < 0 || fd >= MAXOFILE) {
+        return -1;
+    }
+    File *fobj = thisproc()->ofile.ofile[fd];
+    if (fobj == NULL) {
+        return -1;
+    }
+
+    InodeEntry *entry = &fobj->ino->entry;
+    memcpy(entr, entry, sizeof(InodeEntry));
+
+    return 0;
+}
+
+#endif // STAND_ALONE
 
 /** Walk on the directory tree.
  * @param[out] buf leave the last level.

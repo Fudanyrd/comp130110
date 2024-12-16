@@ -201,10 +201,12 @@ typedef struct {
     void (*free)(OpContext *ctx, usize block_no);
 } BlockCache;
 
+#ifndef STAND_ALONE
 /**
     @brief the global block cache instance.
  */
 extern BlockCache bcache;
+#endif // STAND_ALONE
 
 /**
     @brief initialize the block cache.

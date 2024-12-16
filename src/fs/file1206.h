@@ -7,8 +7,6 @@
 
 #include "pipe.h"
 #include "defines.h"
-#include "block_device.h"
-#include "cache.h"
 #include "inode.h"
 
 #include <common/defines.h>
@@ -19,10 +17,6 @@
 
 // maximum number of file can open by a proc.
 #define MAXOFILE (16)
-
-extern BlockDevice block_device;
-extern BlockCache bcache;
-extern InodeTree inodes;
 
 // initialize file system, should enable intr.
 extern void fs_init();
@@ -103,6 +97,14 @@ int sys_dup2(int oldfd, int newfd);
 int sys_link(const char *src, const char *target);
 int sys_unlink(const char *target);
 
+#ifndef STAND_ALONE
+#include "block_device.h"
+#include "cache.h"
+
+extern BlockDevice block_device;
+extern BlockCache bcache;
+extern InodeTree inodes;
+
 /*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *                          File Backends
  -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+*/
@@ -128,3 +130,24 @@ isize fwrite(File* fobj, char* addr, isize n);
 
 /** Share a file object, will have the same offset. */
 File *fshare(File *src);
+#else 
+
+#define F_RDONLY F_READ
+#define F_WRONLY F_WRITE
+#define F_RDWR (F_READ | F_WRITE)
+#define F_CREAT F_CREATE
+
+// other syscalls for copyout
+
+// remove a dir
+static inline int sys_rmdir(const char *path)
+{
+    return sys_unlink (path);
+}
+
+int sys_inode(int fd, InodeEntry *entr);
+
+// used by copyin, copyout
+void file_init(OpContext *ctx, BlockCache *bc);
+
+#endif // STAND_ALONE
