@@ -31,10 +31,12 @@ typedef struct {
     void (*write)(usize block_no, u8 *buffer);
 } BlockDevice;
 
+#ifndef STAND_ALONE
 /**
     @brief the global block device instance.
  */
 extern BlockDevice block_device;
+#endif // STAND_ALONE
 
 /**
     @brief initialize the block device.
