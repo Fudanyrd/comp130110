@@ -59,6 +59,7 @@ dkms.conf
 .vscode/
 .cache/
 .mypy_cache/
+mkfs/
 
 # CMake output
 compile_flags.txt

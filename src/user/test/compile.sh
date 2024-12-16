@@ -14,7 +14,7 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-build=../../../build
+build=../../../mkfs
 uprog=$( ./uprog.sh )
 home=$( ./home.sh )
 tests="init"
@@ -52,6 +52,7 @@ rm *.o
 
 # change to build dir
 cd $build
+echo "Now at directory $( pwd )"
 
 # create a brand new disk image
 cat /dev/zero | head -c 16777216 > sd.img
