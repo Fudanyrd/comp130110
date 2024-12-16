@@ -746,7 +746,7 @@ int sys_chdir(const char *path)
     if (ino == NULL) {
         // fail
         kfree(buf);
-        return NULL;
+        return -1;
     }
 
     inodes.lock(ino);
@@ -923,10 +923,10 @@ static void inode_rm_entry(OpContext *ctx, Inode *dir, usize num);
 /** Unlink a file or directory */
 int sys_unlink(const char *target)
 {
-    ASSERT(IS_KERNEL_ADDR(target));
     if (*target == NULL) {
         return -1;
     }
+    ASSERT(IS_KERNEL_ADDR(target));
 
 
     Proc *proc = thisproc();
@@ -954,7 +954,7 @@ int sys_unlink(const char *target)
     if (ino == NULL) {
         // fail
         kfree(buf);
-        return NULL;
+        return -1;
     }
 
     // number of dest inode
