@@ -30,6 +30,7 @@ for up in $uprog; do
         echo "Abort" 1>&2
         exit 1
     fi
+	strip $up
     mv $up $build/$up
 done
 
@@ -40,6 +41,7 @@ for up in $tests; do
         echo "Abort" 1>&2
         exit 1
     fi
+	strip $up # stripped executable
     mv $up $build/$up
 done
 
