@@ -63,6 +63,8 @@ extern int exec(const char *path, char **argv)
     // alloc lazily. Do not do mapping.
     struct section *heap = kalloc(sizeof(struct section));
     heap->flags = 0;
+    heap->flags |= PF_R; // readable heap
+    heap->flags |= PF_W; // writable heap
     heap->npages = 0;
     heap->start = round_up(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
     pgdir_add_section(pd, heap);
@@ -76,6 +78,8 @@ extern int exec(const char *path, char **argv)
     // add the stack area in pgdir.
     struct section *sec = kalloc(sizeof(struct section));
     sec->flags = 0;
+    sec->flags |= PF_R; // readable
+    sec->flags |= PF_W; // writable
     sec->npages = 1;
     sec->start = (u64)(STACK_START - PAGE_SIZE);
     pgdir_add_section(pd, sec);
@@ -169,6 +173,16 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
     sec->flags = 0;
     sec->npages = (end - start) / PAGE_SIZE;
     sec->start = (u64)start;
+    // set flags based on ph flag
+    if (ph->p_flags & PF_R) {
+        sec->flags |= PF_R;
+    }
+    if (ph->p_flags & PF_W) {
+        sec->flags |= PF_W;
+    }
+    if (ph->p_flags & PF_X) {
+        sec->flags |= PF_X;
+    }
     pgdir_add_section(pd, sec);
     sec = NULL; // avoid further modification
 
