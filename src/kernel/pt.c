@@ -3,6 +3,7 @@
 #include <common/string.h>
 #include <aarch64/intrinsic.h>
 #include <aarch64/mmu.h>
+#include <kernel/exec1207.h>
 
 /** Returns a page filled with 0 */
 static inline void *pte_page(void)
@@ -232,7 +233,7 @@ void pgdir_add_section(struct pgdir *pgdir, struct section *sec)
 }
 
 /* Returns a page of same content as pgdir at va. */
-static void *page_dup(struct pgdir *src, u64 va)
+static void *page_dup(struct pgdir *src, u64 va, bool writable)
 {
     ASSERT(va % PAGE_SIZE == 0 && va != 0);
     PTEntry *pt = get_pte(src, va, false);
@@ -240,6 +241,13 @@ static void *page_dup(struct pgdir *src, u64 va)
 
     // kernel addr of source page
     void *source = (void *)(P2K(*pt & (~0xFFF)));
+
+    if (!writable) {
+        // do not need to allocate 
+        // for the page is not mutable,
+        // hence can be safely shared.
+        return kshare_page(source);
+    }
 
     // dest page
     void *pg = kalloc_page();
@@ -251,10 +259,13 @@ static void *page_dup(struct pgdir *src, u64 va)
 }
 
 // install the page at va in src to dst.
-static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va)
+// based on whether the page is mutable, 
+// take different 'copy' approaches
+static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va, 
+                      bool writable)
 {
     ASSERT(va % PAGE_SIZE == 0 && va != 0);
-    void *pg = page_dup(src, va);
+    void *pg = page_dup(src, va, writable);
 
     PTEntry *pt = get_pte(dst, va, true);
     ASSERT(pt != NULL);
@@ -283,7 +294,8 @@ void pgdir_clone(struct pgdir *dst, struct pgdir *src)
 
             // for each of the page, make a clone
             for (u32 i = 0; i < s->npages; i++) {
-                page_copy(dst, src, s->start + PAGE_SIZE * i);
+                page_copy(dst, src, s->start + PAGE_SIZE * i, 
+                          (s->flags & PF_W) != 0);
             }
 
             // add to the list of dst

@@ -252,6 +252,7 @@ install_bad:
 int fork()
 {
     Proc *child = create_proc();
+    // printk("[PROC] %p\n", child);
     if (child == NULL) {
         // fail
         return -1;
