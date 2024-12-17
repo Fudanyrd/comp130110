@@ -2,6 +2,13 @@
 # compile all user programs and tests, then put in
 # the build directory and disk image.
 
+uprog=$( ./uprog.sh )
+if [[ $# -ne 1 ]]; then
+	echo "No test cases specified. Use default uprog.sh" 2>&1
+else
+	uprog=$( $1 )
+fi
+
 ls init.c
 if [[ $? -ne 0 ]]; then
     echo "init.c not found, required."
@@ -15,7 +22,6 @@ if [[ $? -ne 0 ]]; then
 fi
 
 build=../../../mkfs
-uprog=$( ./uprog.sh )
 home=$( ./home.sh )
 tests="init"
 cflags="-static -ffreestanding -O3 -fno-plt -fno-pic -mgeneral-regs-only"
