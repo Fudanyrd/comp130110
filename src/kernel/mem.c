@@ -46,3 +46,8 @@ void kfree(void *ptr)
     free(ptr);
     return;
 }
+
+void *kshare_page(void *pg)
+{
+    return palloc_share(pg);
+}
