@@ -31,12 +31,14 @@ set(lab3cases "alloc2023;trap")
 set(lab4cases "alloc2023;trap")
 # Lab 5: Log FS, but will test previous cases
 set(lab5cases "alloc2023;trap;proc;user")
+# Lab 6: disable all
+set(lab6cases "")
 
 # enabled test cases
 # (warning: too many test cases result in too many images)
 # TO ENABLE ALL TESTS: 
 # set(tcases "${lab0cases};${lab1cases};...;${labncases}" CACHE STRING "")
-set(tcases "${lab5cases}" CACHE STRING "")
+set(tcases "${lab6cases}" CACHE STRING "")
 
 # add all of your test cases here.
 # and build a library for it.
