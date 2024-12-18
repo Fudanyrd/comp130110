@@ -91,3 +91,32 @@ static void *find_mmap_addr(struct pgdir *pd, u64 len)
 
     return NULL;
 }
+
+int section_unmap(struct pgdir *pd, struct section *sec)
+{
+    ASSERT(pd != NULL && sec != NULL);
+    ASSERT((sec->start & 0xfff) == 0);
+
+    for (u32 i = 0; i < sec->npages; i++) {
+
+        // deallocate all pages.
+        u64 addr = i * PAGE_SIZE + sec->start;
+        PTEntry *pte = get_pte(pd, addr, false);
+
+        if (sec->flags & PF_F) {
+            ASSERT(sec->fobj != NULL);
+            // FIXME: consider file write back
+            // if writable.
+            fclose(sec->fobj);
+        }
+
+        // we accept pte to be NULL 
+        // since mmap does lazy mmaping.
+        if (pte != NULL) {
+            u64 pg = P2K(*pte & (~0xffful));
+            kfree_page((void *)pg);
+        }
+    }
+
+    return 0;
+}

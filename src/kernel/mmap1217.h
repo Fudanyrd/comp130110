@@ -24,3 +24,10 @@ u64 mmap(void *addr, u64 length, int prot, int flags,
            int fd, isize offset);
 
 int munmap(void *addr, u64 length);
+
+// kernel helper methods. 
+
+/** Destroy page mapping according to sec. Will NOT free sec.
+ * @return 0 if successful.
+ */
+extern int section_unmap(struct pgdir *pd, struct section *sec);
