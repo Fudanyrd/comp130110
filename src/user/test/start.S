@@ -109,3 +109,9 @@ sys_sbrk:
     mov w8, #17
     svc #0
     ret
+
+.globl sys_mmap
+sys_mmap:
+    mov w8, #18
+    svc #0
+    ret
