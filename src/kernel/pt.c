@@ -281,6 +281,9 @@ static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va,
     // install in dst pgdir.
     *pt = K2P(pg);
     *pt |= PTE_USER_DATA;
+    if (!writable) {
+        *pt = K2P(pg) | PTE_USER_DATA | PTE_RO;
+    }
 
     return;
 }

@@ -163,6 +163,12 @@ int section_install(struct pgdir *pd, struct section *sec, u64 uva)
     if (pte == NULL) {
         return -1;
     }
+    if (*pte != 0) {
+        ASSERT(*pte & PTE_VALID);
+        // this is caused by EACCESS, i.e.
+        // write to read-only page
+        return -1;
+    }
 
     void *pg = kalloc_page();
     if (pg == NULL) {
@@ -182,7 +188,12 @@ int section_install(struct pgdir *pd, struct section *sec, u64 uva)
         memset(pg, 0, PAGE_SIZE);
     }
 
+    pte = get_pte(pd, uva, true);
     *pte = K2P(pg);
     *pte |= PTE_USER_DATA;
+    if ((sec->flags & PF_W) == 0) {
+        // read-only
+        *pte = *pte | PTE_RO;
+    }
     return 0;
 }

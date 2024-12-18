@@ -211,7 +211,11 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
         fread(exe, (char *)pg + ph->p_vaddr % PAGE_SIZE, tmp);
 
         // install the page
+        entr = get_pte(pd, (u64)start, true);
         *entr = K2P(pg) | PTE_USER_DATA;
+        if ((ph->p_flags & PF_W) == 0) {
+            *entr = K2P(pg) | PTE_USER_DATA | PTE_RO;
+        }
 
         // advance.
         start += PAGE_SIZE;
@@ -240,7 +244,11 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
             memset(pg + nread, 0, PAGE_SIZE - nread);
             nread = 0;
         }
+        entr = get_pte(pd, (u64)start, true);
         *entr = K2P(pg) | prot;
+        if ((ph->p_flags & PF_W) == 0) {
+            *entr = K2P(pg) | PTE_USER_DATA | PTE_RO;
+        }
 
         // advance.
         offset += PAGE_SIZE;
