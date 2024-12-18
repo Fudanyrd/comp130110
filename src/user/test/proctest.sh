@@ -2,4 +2,4 @@
 ### Proc test cases
 # configure your user programs here!
 ###
-echo sh xsh echo ls stat fork wait pipe count
+echo sh echo ls stat fork wait pipe count cat wc
