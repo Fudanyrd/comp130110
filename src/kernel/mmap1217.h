@@ -31,3 +31,11 @@ int munmap(void *addr, u64 length);
  * @return 0 if successful.
  */
 extern int section_unmap(struct pgdir *pd, struct section *sec);
+
+// return the section that guards uva.
+// null if not found. 
+extern struct section *section_search(struct pgdir *pd, u64 uva);
+
+// fetch missing page at uva.
+// return 0 if the page is installed at uva.
+extern int section_install(struct pgdir *pd, struct section *sec, u64 uva);

@@ -1,5 +1,6 @@
 #include <kernel/mmap1217.h>
 #include <fs/file1206.h>
+#include <common/string.h>
 
 #ifndef MIN
 #define MIN(a,b) ((a) > (b) ? (b) : (a))
@@ -50,6 +51,19 @@ u64 mmap(void *addr, u64 length, int prot, int flags,
 
     File *fobj;
     if (fd >= 0 && fd < MAXOFILE && (fobj = ofile[fd]) != NULL) {
+        if (fobj->type != FD_INODE) {
+            // bad fd
+            kfree(sec);
+            return MMAP_FAILED;
+        }
+        Inode *ino = fobj->ino;
+        ASSERT(ino->valid);
+        if (ino->entry.type != INODE_REGULAR) {
+            // bad fd
+            kfree(sec);
+            return MMAP_FAILED;
+        }
+
         // create a file backend.
         sec->fobj = fshare(fobj);
         sec->offset = offset;
@@ -105,7 +119,7 @@ int section_unmap(struct pgdir *pd, struct section *sec)
 
         // we accept pte to be NULL 
         // since mmap does lazy mmaping.
-        if (pte != NULL) {
+        if (pte != NULL && *pte != 0) {
             u64 pg = P2K(*pte & (~0xffful));
             kfree_page((void *)pg);
         }
@@ -118,5 +132,57 @@ int section_unmap(struct pgdir *pd, struct section *sec)
         fclose(sec->fobj);
     }
 
+    return 0;
+}
+
+struct section *section_search(struct pgdir *pd, u64 uva)
+{
+    if (uva == 0) {
+        return NULL;
+    }
+    ASSERT(pd != NULL);
+
+    struct list *lst = &pd->sections;
+    struct list_elem *it = list_begin(lst);
+    struct section *sec;
+
+    for (; it != list_end(lst); it = list_next(it)) {
+        sec = list_entry(it, struct section, node);
+        if (sec->start <= uva && sec->start + sec->npages * PAGE_SIZE > uva) {
+            return sec;
+        }
+    }
+
+    return NULL;
+}
+
+int section_install(struct pgdir *pd, struct section *sec, u64 uva)
+{
+    ASSERT(pd != NULL && sec != NULL);
+    PTEntry *pte = get_pte(pd, uva, true);
+    if (pte == NULL) {
+        return -1;
+    }
+
+    void *pg = kalloc_page();
+    if (pg == NULL) {
+        return -1;
+    }
+
+    // init page.
+    if (sec->flags & PF_F) {
+        // read from file.
+        isize off = sec->offset + (uva - sec->start);
+        Inode *ino = sec->fobj->ino;
+        inodes.lock(ino);
+        inodes.read(ino, pg, off, PAGE_SIZE);
+        inodes.unlock(ino);
+    } else {
+        // zero-init
+        memset(pg, 0, PAGE_SIZE);
+    }
+
+    *pte = K2P(pg);
+    *pte |= PTE_USER_DATA;
     return 0;
 }
