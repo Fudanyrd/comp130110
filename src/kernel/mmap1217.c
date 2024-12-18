@@ -103,19 +103,19 @@ int section_unmap(struct pgdir *pd, struct section *sec)
         u64 addr = i * PAGE_SIZE + sec->start;
         PTEntry *pte = get_pte(pd, addr, false);
 
-        if (sec->flags & PF_F) {
-            ASSERT(sec->fobj != NULL);
-            // FIXME: consider file write back
-            // if writable.
-            fclose(sec->fobj);
-        }
-
         // we accept pte to be NULL 
         // since mmap does lazy mmaping.
         if (pte != NULL) {
             u64 pg = P2K(*pte & (~0xffful));
             kfree_page((void *)pg);
         }
+    }
+
+    if (sec->flags & PF_F) {
+        ASSERT(sec->fobj != NULL);
+        // FIXME: consider file write back
+        // if writable.
+        fclose(sec->fobj);
     }
 
     return 0;

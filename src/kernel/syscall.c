@@ -1,6 +1,7 @@
 #include <kernel/syscall.h>
 #include <kernel/sched.h>
 #include <kernel/printk.h>
+#include <kernel/mmap1217.h>
 #include <kernel/pt.h>
 #include <common/sem.h>
 #include <common/string.h>
@@ -32,6 +33,7 @@ void syscall_fstat(UserContext *ctx);
 void syscall_pipe(UserContext *ctx);
 void syscall_dup2(UserContext *ctx);
 void syscall_sbrk(UserContext *ctx);
+void syscall_mmap(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -54,7 +56,8 @@ void *syscall_table[NR_SYSCALL] = {
     [15] = (void *)syscall_pipe,
     [16] = (void *)syscall_dup2,
     [17] = (void *)syscall_sbrk,
-    [18 ... NR_SYSCALL - 1] = NULL,
+    [18] = (void *)syscall_mmap,
+    [19 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -670,6 +673,13 @@ void syscall_sbrk(UserContext *ctx)
 
     ctx->x0 = heap->start + heap->npages * PAGE_SIZE;
     arch_tlbi_vmalle1is();
+    return;
+}
+
+void syscall_mmap(UserContext *ctx)
+{
+    ctx->x0 = mmap((void *)ctx->x0, ctx->x1, ctx->x2, ctx->x3, 
+                   ctx->x4, ctx->x5);
     return;
 }
 
