@@ -12,6 +12,7 @@
 #pragma GCC diagnostic ignored "-Woverride-init"
 
 extern int exec(const char *path, char **argv);
+static int install_page(struct pgdir *pd, u64 uva);
 
 /** Syscall executor type */
 typedef void (*syscall_fn)(UserContext *);
@@ -129,8 +130,14 @@ isize copyin(struct pgdir *pd, void *ka, u64 va, u64 size)
         ncp = ncp > size ? size : ncp;
 
         PTEntry *entr = get_pte(pd, va, false);
-        if (entr == NULL) {
+        if (entr == NULL || *entr == 0) {
+            install_page(pd, va);
+            entr = get_pte(pd, va, false);
+        }
+        if (entr == NULL || *entr == 0) {
             // error
+            printk("User program %d segfault! Killed\n", thisproc()->pid);
+            thisproc()->killed = true;
             return -1;
         }
 
@@ -161,8 +168,14 @@ isize copyout(struct pgdir *pd, void *ka, u64 va, u64 size)
         ncp = ncp > size ? size : ncp;
 
         PTEntry *entr = get_pte(pd, va, false);
-        if (entr == NULL) {
+        if (entr == NULL || *entr == 0) {
+            install_page(pd, va);
+            entr = get_pte(pd, va, false);
+        }
+        if (entr == NULL || *entr == 0) {
             // error
+            printk("User program %d segfault! Killed\n", thisproc()->pid);
+            thisproc()->killed = true;
             return -1;
         }
 
@@ -190,8 +203,14 @@ extern isize copyinstr(struct pgdir *pd, void *ka, u64 va)
         ncp = ncp > count ? count : ncp;
 
         PTEntry *entr = get_pte(pd, va, false);
-        if (entr == NULL) {
-            // error 
+        if (entr == NULL || *entr == 0) {
+            install_page(pd, va);
+            entr = get_pte(pd, va, false);
+        }
+        if (entr == NULL || *entr == 0) {
+            // error
+            printk("User program %d segfault! Killed\n", thisproc()->pid);
+            thisproc()->killed = true;
             return -1;
         }
 
@@ -681,6 +700,18 @@ void syscall_mmap(UserContext *ctx)
     ctx->x0 = mmap((void *)ctx->x0, ctx->x1, ctx->x2, ctx->x3, 
                    ctx->x4, ctx->x5);
     return;
+}
+
+static int install_page(struct pgdir *pd, u64 faddr)
+{
+
+    struct section *sec = section_search(pd, faddr);
+    if (sec == NULL) {
+        // fail
+        return -1;
+    }
+
+    return section_install(pd, sec, faddr);
 }
 
 #pragma GCC diagnostic pop
