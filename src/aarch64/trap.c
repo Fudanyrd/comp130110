@@ -88,6 +88,7 @@ void trap_global_handler(UserContext *context)
     case ESR_EC_DABORT_EL0:
     case ESR_EC_DABORT_EL1: {
         u64 faddr = arch_get_far();
+        printk("NOTE: esr %p\n", (void *)esr);
         if (pgfault_handler(context, faddr) < 0) {
             printk("User program %d segfault! Killed\n", thisproc()->pid);
             thisproc()->killed = 1;
