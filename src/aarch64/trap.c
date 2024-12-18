@@ -130,6 +130,7 @@ static int pgfault_handler(UserContext *ctx, u64 faddr)
 
     else {
         printk("FATAL: Page fault\n");
+        printk("fault addr: %p\n", (void *)faddr);
         trap_bt(ctx);
         PANIC();
     }
