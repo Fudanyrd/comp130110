@@ -4,6 +4,7 @@
 #include <aarch64/intrinsic.h>
 #include <aarch64/mmu.h>
 #include <kernel/exec1207.h>
+#include <fs/file1206.h>
 
 /** Returns a page filled with 0 */
 static inline void *pte_page(void)
@@ -202,6 +203,13 @@ void free_pgdir(struct pgdir *pgdir)
         elem = list_pop_front(&pgdir->sections);
         struct section *sec = list_entry(elem, struct section, node);
         ASSERT(sec->start % PAGE_SIZE == 0);
+
+        // FIXME: for writable files, 
+        // the content may have to be written back.
+        if (sec->flags & PF_F) {
+            ASSERT(sec->fobj != NULL);
+            fclose(sec->fobj);
+        }
         kfree(sec);
     }
 }
@@ -291,6 +299,11 @@ void pgdir_clone(struct pgdir *dst, struct pgdir *src)
             sec->flags = s->flags;
             sec->npages = s->npages;
             sec->start = s->start;
+            if (s->flags & PF_F) {
+                sec->fobj = fshare(s->fobj);
+            } else {
+                sec->fobj = NULL;
+            }
 
             // for each of the page, make a clone
             for (u32 i = 0; i < s->npages; i++) {
