@@ -5,6 +5,7 @@
 #include <aarch64/mmu.h>
 #include <kernel/exec1207.h>
 #include <fs/file1206.h>
+#include <kernel/mmap1217.h>
 
 /** Returns a page filled with 0 */
 static inline void *pte_page(void)
@@ -193,9 +194,6 @@ void free_pgdir(struct pgdir *pgdir)
     if (pgdir->pt == NULL) {
         return;
     }
-    // recursively free all pages used by page table
-    pgdir_free_lv(pgdir->pt, 0);
-    pgdir->pt = NULL;
 
     // free the sections.
     struct list_elem *elem;
@@ -206,12 +204,14 @@ void free_pgdir(struct pgdir *pgdir)
 
         // FIXME: for writable files, 
         // the content may have to be written back.
-        if (sec->flags & PF_F) {
-            ASSERT(sec->fobj != NULL);
-            fclose(sec->fobj);
-        }
+        section_unmap(pgdir, sec);
         kfree(sec);
     }
+
+    // recursively free all pages used by page table
+    pgdir_free_lv(pgdir->pt, 0);
+    pgdir->heap = NULL;
+    pgdir->pt = NULL;
 }
 
 void attach_pgdir(struct pgdir *pgdir)
@@ -301,8 +301,14 @@ void pgdir_clone(struct pgdir *dst, struct pgdir *src)
             sec->start = s->start;
             if (s->flags & PF_F) {
                 sec->fobj = fshare(s->fobj);
+                sec->offset = s->offset;
             } else {
                 sec->fobj = NULL;
+            }
+            
+            // set the heap of dst.
+            if (s == src->heap) {
+                dst->heap = sec;
             }
 
             // for each of the page, make a clone
