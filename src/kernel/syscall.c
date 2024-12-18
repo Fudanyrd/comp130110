@@ -1,6 +1,7 @@
 #include <kernel/syscall.h>
 #include <kernel/sched.h>
 #include <kernel/printk.h>
+#include <kernel/mmap1217.h>
 #include <kernel/pt.h>
 #include <common/sem.h>
 #include <common/string.h>
@@ -11,6 +12,7 @@
 #pragma GCC diagnostic ignored "-Woverride-init"
 
 extern int exec(const char *path, char **argv);
+static int install_page(struct pgdir *pd, u64 uva);
 
 /** Syscall executor type */
 typedef void (*syscall_fn)(UserContext *);
@@ -32,6 +34,7 @@ void syscall_fstat(UserContext *ctx);
 void syscall_pipe(UserContext *ctx);
 void syscall_dup2(UserContext *ctx);
 void syscall_sbrk(UserContext *ctx);
+void syscall_mmap(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -54,7 +57,8 @@ void *syscall_table[NR_SYSCALL] = {
     [15] = (void *)syscall_pipe,
     [16] = (void *)syscall_dup2,
     [17] = (void *)syscall_sbrk,
-    [18 ... NR_SYSCALL - 1] = NULL,
+    [18] = (void *)syscall_mmap,
+    [19 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -77,6 +81,8 @@ void syscall_entry(UserContext *context)
         // function that executes the syscall
         syscall_fn fn = syscall_table[id]; 
         fn(context);
+        // printk("[KERNEL] pid %d syscall id %lld return %lld\n", 
+        // thisproc()->pid, id, context->x0);
         break;
     }
     }
@@ -124,8 +130,14 @@ isize copyin(struct pgdir *pd, void *ka, u64 va, u64 size)
         ncp = ncp > size ? size : ncp;
 
         PTEntry *entr = get_pte(pd, va, false);
-        if (entr == NULL) {
+        if (entr == NULL || *entr == 0) {
+            install_page(pd, va);
+            entr = get_pte(pd, va, false);
+        }
+        if (entr == NULL || *entr == 0) {
             // error
+            printk("User program %d segfault! Killed\n", thisproc()->pid);
+            thisproc()->killed = true;
             return -1;
         }
 
@@ -156,8 +168,14 @@ isize copyout(struct pgdir *pd, void *ka, u64 va, u64 size)
         ncp = ncp > size ? size : ncp;
 
         PTEntry *entr = get_pte(pd, va, false);
-        if (entr == NULL) {
+        if (entr == NULL || *entr == 0) {
+            install_page(pd, va);
+            entr = get_pte(pd, va, false);
+        }
+        if (entr == NULL || *entr == 0) {
             // error
+            printk("User program %d segfault! Killed\n", thisproc()->pid);
+            thisproc()->killed = true;
             return -1;
         }
 
@@ -185,8 +203,14 @@ extern isize copyinstr(struct pgdir *pd, void *ka, u64 va)
         ncp = ncp > count ? count : ncp;
 
         PTEntry *entr = get_pte(pd, va, false);
-        if (entr == NULL) {
-            // error 
+        if (entr == NULL || *entr == 0) {
+            install_page(pd, va);
+            entr = get_pte(pd, va, false);
+        }
+        if (entr == NULL || *entr == 0) {
+            // error
+            printk("User program %d segfault! Killed\n", thisproc()->pid);
+            thisproc()->killed = true;
             return -1;
         }
 
@@ -669,6 +693,25 @@ void syscall_sbrk(UserContext *ctx)
     ctx->x0 = heap->start + heap->npages * PAGE_SIZE;
     arch_tlbi_vmalle1is();
     return;
+}
+
+void syscall_mmap(UserContext *ctx)
+{
+    ctx->x0 = mmap((void *)ctx->x0, ctx->x1, ctx->x2, ctx->x3, 
+                   ctx->x4, ctx->x5);
+    return;
+}
+
+static int install_page(struct pgdir *pd, u64 faddr)
+{
+
+    struct section *sec = section_search(pd, faddr);
+    if (sec == NULL) {
+        // fail
+        return -1;
+    }
+
+    return section_install(pd, sec, faddr);
 }
 
 #pragma GCC diagnostic pop

@@ -5,6 +5,13 @@
 #include <driver/interrupt.h>
 #include <kernel/proc.h>
 #include <kernel/syscall.h>
+#include <kernel/mmap1217.h>
+
+// if trap from kernel: PANIC
+// if trap from user space:
+// returns 0 if pgfault is handled successfully,
+// else should kill user process
+static int pgfault_handler(UserContext *ctx, u64 faddr);
 
 /** Returns true if trap is from user space */
 static inline int trap_from_user(UserContext *context)
@@ -80,9 +87,11 @@ void trap_global_handler(UserContext *context)
     case ESR_EC_IABORT_EL1:
     case ESR_EC_DABORT_EL0:
     case ESR_EC_DABORT_EL1: {
-        printk("Page fault\n");
-        trap_bt(context);
-        PANIC();
+        u64 faddr = arch_get_far();
+        if (pgfault_handler(context, faddr) < 0) {
+            printk("User program %d segfault! Killed\n", thisproc()->pid);
+            thisproc()->killed = 1;
+        }
     } break;
     default: {
         printk("Unknwon exception %llu\n", ec);
@@ -92,7 +101,10 @@ void trap_global_handler(UserContext *context)
 
     // TODO: stop killed process while returning to user space
     if (thisproc()->killed && trap_from_user(context)) {
-        exit(-1);
+        // use syscall exit 
+        context->x0 = -1;
+        context->x8 = 11;
+        syscall_entry(context);
     }
 }
 
@@ -100,4 +112,25 @@ NO_RETURN void trap_error_handler(u64 type)
 {
     printk("Unknown trap type %llu\n", type);
     PANIC();
+}
+
+static int pgfault_handler(UserContext *ctx, u64 faddr)
+{
+    struct pgdir *pd = &thisproc()->pgdir;
+    faddr = round_down(faddr, PAGE_SIZE);
+    if (trap_from_user(ctx)) {
+        struct section *sec = section_search(pd, faddr);
+        if (sec == NULL) {
+            // fail
+            return -1;
+        }
+
+        return section_install(pd, sec, faddr);
+    }
+
+    else {
+        printk("FATAL: Page fault\n");
+        trap_bt(ctx);
+        PANIC();
+    }
 }

@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <assert.h>
-#include "mock/file.h"
+#include <fs/file1206.h>
 
 // clang-format off
 /**
@@ -86,7 +86,8 @@ int main(int argc, char **argv)
 
     // init root inode
     Inode *rt = inodes.get(ROOT_INODE_NO);
-    inodes.sync(&ctx, rt, false);
+    // sync at this time will trigger error
+    // inodes.sync(&ctx, rt, false);
     rt->valid = true;
     memset((void *)&rt->entry, 0, sizeof(rt->entry));
     rt->entry.num_links = (u16)(0xfff);

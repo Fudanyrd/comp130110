@@ -3,6 +3,9 @@
 #include <common/string.h>
 #include <aarch64/intrinsic.h>
 #include <aarch64/mmu.h>
+#include <kernel/exec1207.h>
+#include <fs/file1206.h>
+#include <kernel/mmap1217.h>
 
 /** Returns a page filled with 0 */
 static inline void *pte_page(void)
@@ -191,9 +194,6 @@ void free_pgdir(struct pgdir *pgdir)
     if (pgdir->pt == NULL) {
         return;
     }
-    // recursively free all pages used by page table
-    pgdir_free_lv(pgdir->pt, 0);
-    pgdir->pt = NULL;
 
     // free the sections.
     struct list_elem *elem;
@@ -201,8 +201,17 @@ void free_pgdir(struct pgdir *pgdir)
         elem = list_pop_front(&pgdir->sections);
         struct section *sec = list_entry(elem, struct section, node);
         ASSERT(sec->start % PAGE_SIZE == 0);
+
+        // FIXME: for writable files, 
+        // the content may have to be written back.
+        section_unmap(pgdir, sec);
         kfree(sec);
     }
+
+    // recursively free all pages used by page table
+    pgdir_free_lv(pgdir->pt, 0);
+    pgdir->heap = NULL;
+    pgdir->pt = NULL;
 }
 
 void attach_pgdir(struct pgdir *pgdir)
@@ -232,7 +241,7 @@ void pgdir_add_section(struct pgdir *pgdir, struct section *sec)
 }
 
 /* Returns a page of same content as pgdir at va. */
-static void *page_dup(struct pgdir *src, u64 va)
+static void *page_dup(struct pgdir *src, u64 va, bool writable)
 {
     ASSERT(va % PAGE_SIZE == 0 && va != 0);
     PTEntry *pt = get_pte(src, va, false);
@@ -240,6 +249,13 @@ static void *page_dup(struct pgdir *src, u64 va)
 
     // kernel addr of source page
     void *source = (void *)(P2K(*pt & (~0xFFF)));
+
+    if (!writable) {
+        // do not need to allocate 
+        // for the page is not mutable,
+        // hence can be safely shared.
+        return kshare_page(source);
+    }
 
     // dest page
     void *pg = kalloc_page();
@@ -251,10 +267,13 @@ static void *page_dup(struct pgdir *src, u64 va)
 }
 
 // install the page at va in src to dst.
-static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va)
+// based on whether the page is mutable, 
+// take different 'copy' approaches
+static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va, 
+                      bool writable)
 {
     ASSERT(va % PAGE_SIZE == 0 && va != 0);
-    void *pg = page_dup(src, va);
+    void *pg = page_dup(src, va, writable);
 
     PTEntry *pt = get_pte(dst, va, true);
     ASSERT(pt != NULL);
@@ -280,10 +299,22 @@ void pgdir_clone(struct pgdir *dst, struct pgdir *src)
             sec->flags = s->flags;
             sec->npages = s->npages;
             sec->start = s->start;
+            if (s->flags & PF_F) {
+                sec->fobj = fshare(s->fobj);
+                sec->offset = s->offset;
+            } else {
+                sec->fobj = NULL;
+            }
+            
+            // set the heap of dst.
+            if (s == src->heap) {
+                dst->heap = sec;
+            }
 
             // for each of the page, make a clone
             for (u32 i = 0; i < s->npages; i++) {
-                page_copy(dst, src, s->start + PAGE_SIZE * i);
+                page_copy(dst, src, s->start + PAGE_SIZE * i, 
+                          (s->flags & PF_W) != 0);
             }
 
             // add to the list of dst

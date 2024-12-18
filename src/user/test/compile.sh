@@ -2,6 +2,13 @@
 # compile all user programs and tests, then put in
 # the build directory and disk image.
 
+uprog=$( ./uprog.sh )
+if [[ $# -ne 1 ]]; then
+	echo "No test cases specified. Use default uprog.sh" 2>&1
+else
+	uprog=$( $1 )
+fi
+
 ls init.c
 if [[ $? -ne 0 ]]; then
     echo "init.c not found, required."
@@ -14,8 +21,7 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-build=../../../build
-uprog=$( ./uprog.sh )
+build=../../../mkfs
 home=$( ./home.sh )
 tests="init"
 cflags="-static -ffreestanding -O3 -fno-plt -fno-pic -mgeneral-regs-only"
@@ -30,6 +36,7 @@ for up in $uprog; do
         echo "Abort" 1>&2
         exit 1
     fi
+	strip $up
     mv $up $build/$up
 done
 
@@ -40,6 +47,7 @@ for up in $tests; do
         echo "Abort" 1>&2
         exit 1
     fi
+	strip $up # stripped executable
     mv $up $build/$up
 done
 
@@ -52,6 +60,7 @@ rm *.o
 
 # change to build dir
 cd $build
+echo "Now at directory $( pwd )"
 
 # create a brand new disk image
 cat /dev/zero | head -c 16777216 > sd.img

@@ -31,19 +31,17 @@ static inline void *pg_round_up(void *addr)
 /** Initialize palloc module */
 void palloc_init(void);
 
-/** Initialize with limited number of pages(for testing).
- * @param npgs number of pages on each cpu.
- */
-void palloc_init_limit(int *npgs);
-
 /** Get a single page. */
 void *palloc_get(void);
 
 /** Free a page. */
 void palloc_free(void *pg);
 
-/** Currently number of pages allocated. */
-size_t palloc_used(void);
+/**
+ * @return the shared page with pg if page count does not overflow,
+ *  else another page with same content.
+ */
+void *palloc_share(void *pg);
 
 /** Interface of an page allocator */
 struct palloc_intf {

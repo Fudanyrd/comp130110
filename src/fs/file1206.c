@@ -1,6 +1,10 @@
 #include "file1206.h"
 
+#ifndef STAND_ALONE
+// these prototypes is not added to copyin, copyout
+
 #include <common/string.h>
+#include <driver/zero.h>
 #include <kernel/proc.h>
 #include <kernel/sched.h>
 #include <kernel/syscall.h>
@@ -11,6 +15,19 @@ extern Device devices[8];
 
 // console device, may be used by a lot of progs
 File *console;
+
+// create a device on this inode.
+static void inode_mknod(Inode *ino, u16 major, u16 minor) 
+{
+    inodes.lock(ino);
+    ino->entry.type = INODE_DEVICE;
+    ino->entry.num_links = 4096;
+    ino->entry.num_bytes  = -1;
+    ino->entry.minor = minor;
+    ino->entry.major = major;
+    ino->rc.count = 4096;
+    inodes.unlock(ino);
+}
 
 void init_devices()
 {
@@ -36,11 +53,33 @@ void init_devices()
 
     // mark it as cannot remove, (pinned)
     Inode *iuart = fuart->ino;
-    iuart->entry.type = INODE_DEVICE;
-    iuart->entry.num_links = 4096;
-    iuart->entry.num_bytes = -1; // max bytes
-    iuart->entry.minor = 0;
-    iuart->rc.count = 4096;
+    inode_mknod (iuart, 0, 0);
+
+    // make a zero device.
+    Device zero;
+    zero.read = zero_read;
+    zero.write = null_write;
+    devices[1] = zero;
+
+    File *fzero = fopen("/dev/zero", F_READ | F_WRITE | F_CREATE);
+    if (fzero == NULL) {
+        printk("cannot create zero\n");
+        PANIC();
+    }
+    inode_mknod (fzero->ino, 0, 1);
+
+    // make a null device
+    Device null;
+    null.read = null_read;
+    null.write = null_write;
+    devices[2] = null;
+
+    File *fnull = fopen("/dev/null", F_READ | F_WRITE | F_CREATE);
+    if (fnull == NULL) {
+        printk("cannot create null\n");
+        PANIC();
+    }
+    inode_mknod (fnull->ino, 0, 2);
 
     // do not sync. It does nothing for a device.
 
@@ -67,6 +106,92 @@ void fs_init()
     ASSERT(inodes.root->valid);
     ASSERT(inodes.root->inode_no == ROOT_INODE_NO);
 }
+
+#else
+#include <string.h>
+
+// no need to check it.
+#define IS_KERNEL_ADDR(foo) (1)
+
+static OpContext *ctx;
+static BlockCache bcache;
+
+typedef struct proc {
+    Inode *cwd;  // current working directory
+    struct oftable ofile;
+} Proc;
+
+static Proc proc;
+
+static Proc *thisproc() {
+    return &proc;
+}
+
+void file_init(OpContext *_ctx, BlockCache *_bc)
+{
+    ctx = _ctx;
+    bcache = *_bc;
+    proc.cwd = inodes.share(inodes.root);
+    inodes.share(inodes.root);
+    inodes.sync(ctx, proc.cwd, false);
+    ASSERT(proc.cwd->valid);
+}
+
+/** Returns file struct. Should use fclose to free it. */
+static File *fopen(const char *path, int flags);
+static void fclose(File *fobj);
+
+/** Returns the position after the seek. -1 if error */
+#define S_SET 0
+#define S_CUR 1
+#define S_END 2
+
+/** Seek a file.
+ * @return the offset after the seek. -1 if failure. 
+ */
+static isize fseek(File *fobj, isize bias, int flag);
+
+/** Returns num bytes read from file */
+static isize fread(File *fobj, char *buf, u64 count);
+
+static isize fwrite(File* fobj, char* addr, isize n);
+
+/** Share a file object, will have the same offset. */
+static File *fshare(File *src);
+
+int sys_create(const char *path, int flags)
+{
+    int type = flags;
+    if (type == INODE_REGULAR) {
+        File *f = fopen(path, F_CREATE | F_READ | F_WRITE);
+        fclose(f);
+        return 0;
+    }
+    if (type == INODE_DIRECTORY) {
+        return sys_mkdir(path);
+    }
+
+    // unsupported.
+    return -1;
+}
+
+int sys_inode(int fd, InodeEntry *entr)
+{
+    if (fd < 0 || fd >= MAXOFILE) {
+        return -1;
+    }
+    File *fobj = thisproc()->ofile.ofile[fd];
+    if (fobj == NULL) {
+        return -1;
+    }
+
+    InodeEntry *entry = &fobj->ino->entry;
+    memcpy(entr, entry, sizeof(InodeEntry));
+
+    return 0;
+}
+
+#endif // STAND_ALONE
 
 /** Walk on the directory tree.
  * @param[out] buf leave the last level.
@@ -289,7 +414,7 @@ static inline isize file_read(File *fobj, char *buf, u64 count)
 
     inodes.lock(ino);
     isize ret = inodes.read(ino, (u8 *)buf, fobj->off, count);
-    fobj->off += ret;
+    fobj->off += ino->entry.type == INODE_DEVICE ? 0 : ret;
     inodes.unlock(ino);
     return ret;
 }
@@ -621,7 +746,7 @@ int sys_chdir(const char *path)
     if (ino == NULL) {
         // fail
         kfree(buf);
-        return NULL;
+        return -1;
     }
 
     inodes.lock(ino);
@@ -798,10 +923,10 @@ static void inode_rm_entry(OpContext *ctx, Inode *dir, usize num);
 /** Unlink a file or directory */
 int sys_unlink(const char *target)
 {
-    ASSERT(IS_KERNEL_ADDR(target));
-    if (*target == NULL) {
+    if (target == NULL) {
         return -1;
     }
+    ASSERT(IS_KERNEL_ADDR(target));
 
 
     Proc *proc = thisproc();
@@ -829,7 +954,7 @@ int sys_unlink(const char *target)
     if (ino == NULL) {
         // fail
         kfree(buf);
-        return NULL;
+        return -1;
     }
 
     // number of dest inode
@@ -889,7 +1014,10 @@ int sys_unlink(const char *target)
             inodes.sync(ctx, pr, false);
 
             // remove the entry tgt from parent dir.
+            ASSERT(pr->entry.num_links > 1);
+            pr->entry.num_links--;
             inode_rm_entry(ctx, pr, no);
+            inodes.sync(ctx, pr, true);
             inodes.unlock(pr);
 
             // clean up
@@ -904,7 +1032,10 @@ int sys_unlink(const char *target)
 
         // parent dir of tgt is ino!
         inodes.lock(ino);
+        ASSERT(ino->entry.num_links > 1);
+        ino->entry.num_links --;
         inode_rm_entry(ctx, ino, no);
+        inodes.sync(ctx, ino, true);
         inodes.unlock(ino);
 
         // clean up
@@ -920,6 +1051,8 @@ int sys_unlink(const char *target)
     return ret;
 }
 
+// inode write will sync.
+// so well this function.
 static void inode_rm_entry(OpContext *ctx, Inode *dir, usize num)
 {
     ASSERT(dir->valid);

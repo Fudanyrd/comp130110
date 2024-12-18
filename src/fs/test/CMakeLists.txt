@@ -11,7 +11,7 @@ include_directories(../..)
 
 set(compiler_warnings "-Wall -Wextra")
 set(compiler_flags "${compiler_warnings} \
-    -O0 -ftree-pre -g \
+    -O0 -ftree-pre -g -DSTAND_ALONE \
     -fno-omit-frame-pointer \
     -fsanitize=undefined \
     -fno-sanitize=alignment")
@@ -45,7 +45,7 @@ add_executable(readfs readfs.c)
 target_link_libraries(readfs fs mock)
 
 add_executable(copyin copyin.c)
-target_link_libraries(copyin fs mock file)
+target_link_libraries(copyin fs mock )
 
 add_executable(copyout copyout.c)
-target_link_libraries(copyout fs mock file)
+target_link_libraries(copyout fs mock )

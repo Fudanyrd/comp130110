@@ -12,6 +12,12 @@ struct page {
     char fre[0];
 };
 
+// use u8 to do ref count, 
+// support at most 255 forks, which is large enough
+typedef u8 refcnt_t;
+
+#define MAX_REF_CNT ((u8)0xff)
+
 /** Page allocator(O(1) for all operations) */
 struct pallocator {
     struct page *frepg; /* pointer to free page. */
@@ -19,12 +25,14 @@ struct pallocator {
     SpinLock lock; /* lock */
 
     /**< Immutable members(don't acquire lock) */
-    size_t npage; /* number of pages */
+    size_t npage; /* number of pages, NOT include refcnt */
     void *start; /* Start address */
     void *end; /* End address */
+    refcnt_t *refcnts; /* Reference count */
 };
 
-static struct pallocator allocators[NCPU];
+// physical page manager.
+static struct pallocator allocator;
 
 /** Check for heap buffer overflow */
 #define CHECK_PA(pa)                                       \
@@ -37,10 +45,17 @@ static struct pallocator allocators[NCPU];
 // Hint: if CHECK_PA fires, use gdb watch point to find out when
 // the page allocator is corrupted.
 
-/** Initialize the page allocator */
+static INLINE refcnt_t *pg2refcnt(void *pg)
+{
+    ASSERT(pg_off(pg) == 0);
+    ASSERT(pg >= allocator.start && pg < allocator.end);
+    return allocator.refcnts + (pg - allocator.start) / PAGE_SIZE;
+}
+
+/** Initialize the page allocator, Will hold lock */
 static void pallocator_init(struct pallocator *pa, void *start, size_t npage);
 
-/** Get a page from allocator */
+/** Get a page from allocator. Will hold lock */
 static void *pallocator_get(struct pallocator *pa);
 
 /** Free a page to allocator(must from pallocator_get) */
@@ -61,116 +76,63 @@ void palloc_init(void)
     ASSERT(first < last && pg_off(first) == 0 && pg_off(last) == 0);
     const size_t npgs = (last - first) / PGSIZE;
 
-    // initialize allocators
-    size_t npg = npgs / NCPU + npgs % NCPU;
-    pallocator_init(&allocators[0], first, npg);
-    first += PGSIZE * npg;
-    for (int i = 1; i < NCPU; i++) {
-        npg = npgs / NCPU;
-        pallocator_init(&allocators[i], first, npg);
-        // advance.
-        first += PGSIZE * npg;
-    }
+    // leave pages for refcnt.
+    // nrf = round_up(npgs, 4096)
+    const size_t nrf = (npgs + PAGE_SIZE - 1) / PAGE_SIZE;
+    ASSERT(nrf < npgs);
+    // init refcount area.
+    memset(first, 0, PAGE_SIZE * nrf);
 
-    // check that no page is wasted.
-    ASSERT(first == last);
-}
+    // update first.
+    allocator.refcnts = (u8 *)first;
+    first += nrf * PAGE_SIZE;
 
-void palloc_init_limit(int *npgs)
-{
-    struct pallocator *p;
-    for (int i = 0; i < NCPU; i++) {
-        p = &allocators[i];
-        p->frepg = NULL;
-        if (npgs[i] == 0) {
-            // invalidate the pallocator
-            // i.e. this allocator does not
-            // allocate any pages
-            p->start = NULL;
-            p->end = NULL;
-            p->npage = 0;
-        } else {
-            // use only npgs pages
-            ASSERT(npgs[i] >= 0);
-            ASSERT((size_t)(npgs[i]) <= p->npage);
-            p->npage = (size_t)(npgs[i]);
-            p->end = p->start + (npgs[i] * PGSIZE);
-            // push this many pages
-            for (void *pt = p->start; pt < p->end; pt += PGSIZE) {
-                p->nalloc += 1;
-                pallocator_free(p, pt);
-            }
-            p->nalloc = 0;
-        }
-
-        CHECK_PA(p);
-    }
+    // init pallocator.
+    pallocator_init(&allocator, first, npgs - nrf);
 }
 
 void *palloc_get(void)
 {
-    const int cpu = cpuid();
-    // currently just allocate from its own allocator.
-    // do not steal from other allocators.
-    //
-    // that is the past. Here we'll try implement
-    // page stealing. First turn to local allocator.
-    void *ret = pallocator_get(&allocators[cpu]);
-    if (ret != NULL) {
-        // yeah!
-        return ret;
-    }
-
-    // seek each cpu sequentially for some.
-    // this is the slow path, and does not happen
-    // frequently.
-    for (int i = 0; i < NCPU; i++) {
-        if (i == cpu) {
-            // do not try local cpu.
-            continue;
-        }
-        ret = pallocator_get(&allocators[i]);
-        if (ret != NULL) {
-            return ret;
-        }
-    }
-
-    // well, all allocators run out of pages.
-    // (This will happen rarely)
-    return NULL;
-}
-
-size_t palloc_used(void)
-{
-    size_t n = 0;
-    for (int i = 0; i < NCPU; i++) {
-        acquire_spinlock(&allocators[i].lock);
-        n += allocators[i].nalloc;
-        release_spinlock(&allocators[i].lock);
-    }
-    return n;
+    void *ret = pallocator_get(&allocator);
+    return ret;
 }
 
 void palloc_free(void *pg)
 {
-    // it is NOT safe to use cpuid() to index into
-    // the allocator, for one page allocated from
-    // a cpu may be freed from another.
-    //
-    // However, this is true only if we implemented the
-    // page stealing mechanism.
+    return pallocator_free(&allocator, pg);
+}
 
-    if (pg == NULL) {
-        return;
-    }
+void *palloc_share(void *pg)
+{
+    ASSERT(pg >= allocator.start && pg < allocator.end);
+    ASSERT(pg_off(pg) == 0);
 
-    for (int i = 0; i < NCPU; i++) {
-        if (allocators[i].start <= pg && allocators[i].end > pg) {
-            pallocator_free(&allocators[i], pg);
-            return;
-        }
+    // fast path: the page count does not overflow.
+    acquire_spinlock(&allocator.lock);
+    refcnt_t *rc = pg2refcnt(pg);
+    ASSERT(*rc > (u8)0);
+    if (*rc != (u8)0xff) {
+        *rc = *rc + 1;
+        // just give the page back.
+        release_spinlock(&allocator.lock);
+        return pg;
     }
-    PANIC("Fatal: cannot find allocator");
+    release_spinlock(&allocator.lock);
+
+    // slow path: should allocate a new page
+    // with the same context
+    void *ret = pallocator_get(&allocator);
+    if (ret != NULL) {
+        memcpy(ret, pg, PAGE_SIZE);
+    }
+    return ret;
+}
+
+static INLINE void push_page(struct pallocator *pa, void *pg)
+{
+    struct page *p = pg;
+    p->nxt = pa->frepg;
+    pa->frepg = p;
 }
 
 /**
@@ -191,8 +153,7 @@ static void pallocator_init(struct pallocator *pa, void *start, size_t npage)
     // put all pages onto free list.
     void *pg = start;
     for (size_t i = 0; i < npage; i++) {
-        pa->nalloc++;
-        pallocator_free(pa, pg);
+        push_page(&allocator, pg);
         pg += PGSIZE;
     }
 
@@ -217,6 +178,11 @@ static void *pallocator_get(struct pallocator *pa)
     pa->frepg = pa->frepg->nxt;
     pa->nalloc++;
 
+    // update ref count
+    refcnt_t *rc = pg2refcnt(ret);
+    ASSERT(*rc == (u8)0);
+    *rc = *rc + 1;
+
     // return
     release_spinlock(&pa->lock);
     ASSERT(ret >= pa->start && ret < pa->end);
@@ -236,6 +202,19 @@ static void pallocator_free(struct pallocator *pa, void *pg)
     }
     ASSERT(pg_off(pg) == 0);
     ASSERT(pg >= pa->start && pg < pa->end);
+
+    // deal with refcount
+    acquire_spinlock(&pa->lock);
+    refcnt_t *rc = pg2refcnt(pg);
+    ASSERT(*rc > (u8)0x0);
+    *rc = *rc - 1;
+    if (*rc > 0) {
+        // it is used by someone else, do NOT free
+        release_spinlock(&pa->lock);
+        return;
+    }
+    release_spinlock(&pa->lock);
+
     // fill with junks, to detect use-after-free.
     memset(pg, 0xcc, PGSIZE);
 

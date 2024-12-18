@@ -1,4 +1,5 @@
 #include <fs/defines.h>
+#include <fs/file1206.h>
 #include <fs/inode.h>
 #include <fcntl.h>
 #include <string.h>
@@ -8,7 +9,6 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "mock/file.h"
 
 // clang-format off
 /**

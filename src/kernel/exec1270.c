@@ -44,6 +44,7 @@ extern int exec(const char *path, char **argv)
         goto exec_bad;
     }
 
+    u64 heap_st = 0;
     // read each segment from disk.
     for (Elf64_Half i = 0; i < ehdr->e_phnum; i++) {
         isize offset = ehdr->e_phoff + i * sizeof(Elf64_Phdr);
@@ -53,6 +54,8 @@ extern int exec(const char *path, char **argv)
 
         if (phdr->p_type == PT_LOAD) {
             // load into page table.
+            u64 sec_end = round_up(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
+            heap_st = sec_end > heap_st ? sec_end : heap_st;
             if (install_section(pd, phdr, exe) != 0) {
                 goto exec_bad;
             }
@@ -63,8 +66,10 @@ extern int exec(const char *path, char **argv)
     // alloc lazily. Do not do mapping.
     struct section *heap = kalloc(sizeof(struct section));
     heap->flags = 0;
+    heap->flags |= PF_R; // readable heap
+    heap->flags |= PF_W; // writable heap
     heap->npages = 0;
-    heap->start = round_up(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
+    heap->start = heap_st;
     pgdir_add_section(pd, heap);
     pd->heap = heap;
 
@@ -76,6 +81,8 @@ extern int exec(const char *path, char **argv)
     // add the stack area in pgdir.
     struct section *sec = kalloc(sizeof(struct section));
     sec->flags = 0;
+    sec->flags |= PF_R; // readable
+    sec->flags |= PF_W; // writable
     sec->npages = 1;
     sec->start = (u64)(STACK_START - PAGE_SIZE);
     pgdir_add_section(pd, sec);
@@ -169,6 +176,16 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
     sec->flags = 0;
     sec->npages = (end - start) / PAGE_SIZE;
     sec->start = (u64)start;
+    // set flags based on ph flag
+    if (ph->p_flags & PF_R) {
+        sec->flags |= PF_R;
+    }
+    if (ph->p_flags & PF_W) {
+        sec->flags |= PF_W;
+    }
+    if (ph->p_flags & PF_X) {
+        sec->flags |= PF_X;
+    }
     pgdir_add_section(pd, sec);
     sec = NULL; // avoid further modification
 
@@ -238,6 +255,7 @@ install_bad:
 int fork()
 {
     Proc *child = create_proc();
+    // printk("[PROC] %p\n", child);
     if (child == NULL) {
         // fail
         return -1;
