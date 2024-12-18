@@ -172,7 +172,7 @@ isize copyout(struct pgdir *pd, void *ka, u64 va, u64 size)
             install_page(pd, va);
             entr = get_pte(pd, va, false);
         }
-        if (entr == NULL || *entr == 0) {
+        if (entr == NULL || *entr == 0 || *entr & PTE_RO) {
             // error
             printk("User program %d segfault! Killed\n", thisproc()->pid);
             thisproc()->killed = true;
