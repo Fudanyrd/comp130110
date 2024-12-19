@@ -240,32 +240,6 @@ void pgdir_add_section(struct pgdir *pgdir, struct section *sec)
     list_insert_ordered(&pgdir->sections, &sec->node, sec_less_func, NULL);
 }
 
-/* Returns a page of same content as pgdir at va. */
-static void *page_dup(struct pgdir *src, u64 va, bool writable)
-{
-    ASSERT(va % PAGE_SIZE == 0 && va != 0);
-    PTEntry *pt = get_pte(src, va, false);
-    ASSERT(pt != NULL);
-
-    // kernel addr of source page
-    void *source = (void *)(P2K(*pt & (~0xFFF)));
-
-    if (!writable) {
-        // do not need to allocate 
-        // for the page is not mutable,
-        // hence can be safely shared.
-        return kshare_page(source);
-    }
-
-    // dest page
-    void *pg = kalloc_page();
-    ASSERT(pg != NULL);
-
-    // copy
-    memcpy(pg, source, PAGE_SIZE);
-    return pg;
-}
-
 // install the page at va in src to dst.
 // based on whether the page is mutable, 
 // take different 'copy' approaches
@@ -273,19 +247,41 @@ static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va,
                       bool writable)
 {
     ASSERT(va % PAGE_SIZE == 0 && va != 0);
-    void *pg = page_dup(src, va, writable);
+    // get the entry from src.
+    PTEntry *sentr = get_pte(src, va, false);    
+    PTEntry *dentr = get_pte(dst, va, true);
+    ASSERT(dentr != NULL);
 
-    PTEntry *pt = get_pte(dst, va, true);
-    ASSERT(pt != NULL);
-
-    // install in dst pgdir.
-    *pt = K2P(pg);
-    *pt |= PTE_USER_DATA;
-    if (!writable) {
-        *pt = K2P(pg) | PTE_USER_DATA | PTE_RO;
+    if (sentr == NULL) {
+        // not mapped
+        *dentr = 0;
+        return;
     }
+    if ((*sentr & PTE_VALID) == 0) {
+        // not mapped
+        *dentr = 0;
+        return;
+    }
+    ASSERT((*sentr & PTE_PAGE) == PTE_PAGE);
 
-    return;
+    // COW: mark as readable, and share the pages.
+    // this is done lazily, of course
+    // later if write happens, mmap1217::section_install
+    // will handle it.
+
+    // first tell the allocator to incr the page count.
+    void *shared = (void *)(P2K(*sentr & (~0xffful)));
+    // page for dst pgdir.
+    void *dup = kshare_page(shared);
+    if (shared == dup) {
+        *sentr |= PTE_RO;
+        *dentr = *sentr;
+    } else {
+        *dentr = K2P(dup) | PTE_USER_DATA;
+        if (!writable) {
+            *dentr = *dentr | PTE_RO;
+        }
+    }
 }
 
 void pgdir_clone(struct pgdir *dst, struct pgdir *src)
