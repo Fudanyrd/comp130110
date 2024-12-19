@@ -3,11 +3,14 @@
 #include <common/spinlock.h>
 #include <driver/memlayout.h>
 #include <kernel/mem.h>
+#include <common/string.h>
 // #include <kernel/printk.h>
 
 #include <fdutil/malloc.h>
 
 RefCount kalloc_page_cnt;
+
+static void *zero_page;
 
 void kinit()
 {
@@ -15,6 +18,10 @@ void kinit()
     /** Initialize palloc and malloc module. */
     palloc_init();
     malloc_init();
+
+    zero_page = palloc_get();
+    ASSERT(zero_page != NULL);
+    memset(zero_page, 0, PAGE_SIZE);
 }
 
 void *kalloc_page()
@@ -27,6 +34,13 @@ void *kalloc_page()
 void kfree_page(void *p)
 {
     decrement_rc(&kalloc_page_cnt);
+    // check offset 
+    ASSERT(((u64)p & 0xffful) == 0);
+
+    if (p == zero_page) {
+        // do not do free on this page.
+        return;
+    }
     palloc_free(p);
     return;
 }
@@ -50,4 +64,10 @@ void kfree(void *ptr)
 void *kshare_page(void *pg)
 {
     return palloc_share(pg);
+}
+
+void *kalloc_zero()
+{
+    increment_rc(&kalloc_page_cnt);
+    return zero_page;
 }
