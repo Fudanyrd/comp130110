@@ -167,7 +167,22 @@ int section_install(struct pgdir *pd, struct section *sec, u64 uva)
         ASSERT(*pte & PTE_VALID);
         // this is caused by EACCESS, i.e.
         // write to read-only page
-        return -1;
+
+        if ((sec->flags & PF_W) == 0) {
+            // write to read-only page
+            return -1;
+        }
+
+        // the page should be writeable, but have 
+        // read-only enabled. So we copy the page,
+        // and mark it as writable.
+        void *pg = kalloc_page();
+        void *src = (void *)P2K(*pte & (~0xffful));
+        ASSERT(((u64)src & 0xFFF) == 0);
+        memcpy(pg, src, PAGE_SIZE);
+        *pte = K2P(pg) | PTE_USER_DATA;
+        kfree_page(src);
+        return 0;
     }
 
     void *pg = kalloc_page();
