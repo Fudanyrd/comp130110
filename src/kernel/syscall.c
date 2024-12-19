@@ -168,7 +168,12 @@ isize copyout(struct pgdir *pd, void *ka, u64 va, u64 size)
         ncp = ncp > size ? size : ncp;
 
         PTEntry *entr = get_pte(pd, va, false);
-        if (entr == NULL || *entr == 0) {
+        // this may be:
+        // (a) a lazily mapped page;
+        // (b) a Copy-on-Write page;
+        if (entr == NULL || *entr == 0 || *entr & PTE_RO) {
+            // for COW page, section_install() will
+            // duplicate it and mark it as writable.
             install_page(pd, va);
             entr = get_pte(pd, va, false);
         }
@@ -674,17 +679,19 @@ void syscall_sbrk(UserContext *ctx)
     u64 end = round_up(start + grow, PAGE_SIZE);
     for (; start < end; start += PAGE_SIZE) {
         // install a page at virtual address start.
-        void *page = kalloc_page();
-        if (page == NULL) {
-            // cannot alloc
-            break;
-        }
+        void *page = kalloc_zero();
+        ASSERT(page != NULL);
         memset(page, 0, PAGE_SIZE);
 
         // install page
         PTEntry *pte = get_pte(pd, start, true);
         *pte = K2P(page);
         *pte |= PTE_USER_DATA;
+
+        // mark as read-only,
+        // when the user writes it,
+        // it will be duped.
+        *pte = *pte | PTE_RO;
 
         // advance.
         heap->npages++;
