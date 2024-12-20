@@ -10,6 +10,7 @@
 #include "inode.h"
 
 #include <common/defines.h>
+#include <net/socket.h>
 
 #define F_READ 0x1
 #define F_WRITE 0x2
@@ -35,7 +36,8 @@ typedef struct file {
     enum { 
         FD_NONE = 0, 
         FD_PIPE, 
-        FD_INODE 
+        FD_INODE,
+        FD_SOCK
     } type;
 
     // reference count.
@@ -47,6 +49,7 @@ typedef struct file {
     union {
         Inode* ino;
         struct pipe* pipe;
+        Socket *sock;
     };
 
     // offset of the file in bytes.

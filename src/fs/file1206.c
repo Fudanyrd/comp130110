@@ -390,6 +390,12 @@ void fclose(File *fobj)
         inodes.put(NULL, fobj->ino);
         break;
     }
+    case (FD_SOCK): {
+        if (fobj->ref <= 1) {
+            sock_close(fobj->sock);
+        }
+        break;
+    }
     }
 
     ASSERT(fobj->ref > 0);
@@ -439,6 +445,10 @@ isize fread(File *fobj, char *buf, u64 count)
     }
     case (FD_INODE): {
         ret = file_read(fobj, buf, count);
+        break;
+    }
+    case (FD_SOCK): {
+        ret = sock_read(fobj->sock, buf, count);
         break;
     }
     }
@@ -588,6 +598,10 @@ isize fwrite(File *fobj, char* addr, isize n)
     }
     case (FD_PIPE): {
         ret = pipe_write(fobj->pipe, addr, n);
+        break;
+    }
+    case (FD_SOCK): {
+        ret = sock_write(fobj->sock, addr, n);
         break;
     }
     default : {

@@ -7,6 +7,7 @@
 #include <common/string.h>
 #include <test/test.h>
 #include <aarch64/intrinsic.h>
+#include <net/syscall.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Woverride-init"
@@ -36,6 +37,7 @@ void syscall_dup2(UserContext *ctx);
 void syscall_sbrk(UserContext *ctx);
 void syscall_mmap(UserContext *ctx);
 void syscall_munmap(UserContext *ctx);
+void syscall_socket(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -60,7 +62,8 @@ void *syscall_table[NR_SYSCALL] = {
     [17] = (void *)syscall_sbrk,
     [18] = (void *)syscall_mmap,
     [19] = (void *)syscall_munmap,
-    [20 ... NR_SYSCALL - 1] = NULL,
+    [20] = (void *)syscall_socket,
+    [21 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -714,6 +717,12 @@ void syscall_mmap(UserContext *ctx)
 void syscall_munmap(UserContext *ctx)
 {
     ctx->x0 = munmap((void *)ctx->x0, ctx->x1);
+    return;
+}
+
+void syscall_socket(UserContext *ctx)
+{
+    ctx->x0 = sys_socket(ctx->x0, ctx->x1, ctx->x2);
     return;
 }
 
