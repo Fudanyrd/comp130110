@@ -35,6 +35,7 @@ void syscall_pipe(UserContext *ctx);
 void syscall_dup2(UserContext *ctx);
 void syscall_sbrk(UserContext *ctx);
 void syscall_mmap(UserContext *ctx);
+void syscall_munmap(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -58,7 +59,8 @@ void *syscall_table[NR_SYSCALL] = {
     [16] = (void *)syscall_dup2,
     [17] = (void *)syscall_sbrk,
     [18] = (void *)syscall_mmap,
-    [19 ... NR_SYSCALL - 1] = NULL,
+    [19] = (void *)syscall_munmap,
+    [20 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -706,6 +708,12 @@ void syscall_mmap(UserContext *ctx)
 {
     ctx->x0 = mmap((void *)ctx->x0, ctx->x1, ctx->x2, ctx->x3, 
                    ctx->x4, ctx->x5);
+    return;
+}
+
+void syscall_munmap(UserContext *ctx)
+{
+    ctx->x0 = munmap((void *)ctx->x0, ctx->x1);
     return;
 }
 

@@ -45,6 +45,7 @@ u64 mmap(void *addr, u64 length, int prot, int flags,
     sec->fobj = NULL;
 
     // set flags
+    sec->flags = 0;
     sec->flags |= (prot & PROT_READ);
     sec->flags |= (prot & PROT_WRITE);
     sec->flags |= (prot & PROT_EXEC);
@@ -132,6 +133,76 @@ int section_unmap(struct pgdir *pd, struct section *sec)
         fclose(sec->fobj);
     }
 
+    return 0;
+}
+
+int munmap(void *addr, u64 length)
+{
+    if (((u64)addr & 0xfff) != 0) {
+        // invalid parameter to addr:
+        // must be page aligned
+        return -1;
+    }
+
+    struct pgdir *pd = &thisproc()->pgdir;
+    struct section *sec = section_search(pd, (u64)addr);
+    // end addr of sec
+    const u64 end = sec->start + sec->npages * PAGE_SIZE;
+
+    if (sec == NULL || sec->start < MMAP_MIN_ADDR || 
+        end >= MMAP_MAX_ADDR) {
+        // EINVAL
+        // must be a page allocated by mmap()
+        return -1;
+    }
+
+    // round length to page size.
+    length = length - length % PAGE_SIZE;
+    if (length == 0) {
+        return 0;
+    }
+
+    struct section *left = NULL;
+    struct section *right = NULL;
+    // it is allowed to leave some pages in the front.
+    if ((u64)addr > sec->start) {
+        left = kalloc(sizeof(struct section));
+        left->start = sec->start;
+        left->npages = ((u64)addr - sec->start) / PAGE_SIZE;
+        left->flags = sec->flags;
+        left->fobj = fshare(sec->fobj);
+        left->offset = sec->offset;
+    }
+
+    if ((u64)addr + length < end) {
+        // create a mapping at end.
+        right = kalloc(sizeof(struct section));
+        right->start = (u64)addr + length;
+        right->npages = (end - right->start) / PAGE_SIZE;
+        right->flags = sec->flags;
+        right->fobj = fshare(sec->fobj);
+        // note: the offset is biased!
+        right->offset = sec->offset + (right->start - sec->start);
+    }
+
+    // remove from list.
+    list_remove(&sec->node);
+    // this will close sec's file backend, which is expected.
+    // modify sec so that section_unmap() do the right thing.
+    sec->start = (u64)addr;
+    sec->npages = length / PAGE_SIZE;
+    section_unmap(pd, sec);
+    kfree(sec);
+
+    // if any, add the rest 'segment' to the pgdir.
+    if (left != NULL) {
+        pgdir_add_section(pd, left);
+    }
+    if (right != NULL) {
+        pgdir_add_section(pd, right);
+    }
+
+    // ok.
     return 0;
 }
 
