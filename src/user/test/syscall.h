@@ -4,9 +4,9 @@
 #define O_READ 0x1
 #define O_WRITE 0x2
 #define O_CREATE 0x4
+#define O_TRUNC 0x8
 
 #define O_RDWR (O_READ | O_WRITE)
-#define O_TRUNC 0
 #define O_RDONLY O_READ
 #define O_WRONLY O_WRITE
 

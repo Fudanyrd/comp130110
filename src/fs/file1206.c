@@ -378,6 +378,16 @@ File *fopen(const char *path, int flags)
         inodes.lock(fino);
         inodes.sync(NULL, fino, false);
         inodes.unlock(fino);
+        if ((flags & F_TRUNC) && (flags & F_WRITE) &&
+            fino->entry.type == INODE_REGULAR) {
+            // truncate the regular file
+            OpContext *ctx = kalloc(sizeof(OpContext));
+            bcache.begin_op(ctx);
+            inodes.lock(fino);
+            inodes.clear(ctx, fino);
+            inodes.unlock(fino);
+            bcache.end_op(ctx);
+        }
         inodes.put(NULL, ino);
     }
     ASSERT(fino->valid);

@@ -15,6 +15,7 @@
 #define F_READ 0x1
 #define F_WRITE 0x2
 #define F_CREATE 0x4
+#define F_TRUNC 0x8
 
 // maximum number of file can open by a proc.
 #define MAXOFILE (16)
