@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 
 static void opentest(void)
 {
-    int fd = sys_open("init", O_READ);
+    int fd = sys_open("/init", O_READ);
     if (fd < 0) {
         sys_print("open FAIL", 9);
         return;
