@@ -11,6 +11,8 @@
 #include <driver/gicv3.h>
 #include <driver/timer.h>
 #include <driver/virtio.h>
+#include <net/net.h>
+#include <net/socket.h>
 
 static volatile bool boot_secondary_cpus = false;
 
@@ -49,8 +51,10 @@ void main()
         arch_fence();
 
         // start networking
-        // pci_init();
-        // __sync_synchronize();
+        pci_init();
+        __sync_synchronize();
+        sock_init();
+        __sync_synchronize();
 
         // Set a flag indicating that the secondary CPUs can start executing.
         boot_secondary_cpus = true;
