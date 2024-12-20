@@ -1007,6 +1007,57 @@ static void inode_remove(OpContext *ctx, Inode *inode, usize index)
     kfree(de);
 }
 
+static void inode_dsan(OpContext *ctx, Inode *inode)
+{
+    InodeEntry *entry = &inode->entry;
+    ASSERT(entry->type == INODE_DIRECTORY);
+
+    usize offset = 0;
+    usize nbyte = 0;
+    usize rest = inode->entry.num_bytes;
+    ASSERT(inode->entry.num_bytes % sizeof(DirEntry) == 0);
+    while (rest >= BLOCK_SIZE) {
+        // can read 512 / 16 = 32 inodes a time!
+        // we read directly in the cache to avoid
+        // memory copy.
+
+        bool modified;
+        usize idx = inode_map(NULL, inode, offset, &modified);
+        ASSERT(!modified);
+        Block *block = cache->acquire(idx);
+        DirEntry *de = (DirEntry *)block->data;
+        for (usize i = 0; i < BLOCK_SIZE / sizeof(DirEntry); i++) {
+            if (de[i].inode_no != 0) {
+                nbyte = offset + (i + 1) * sizeof(DirEntry);
+            }
+        }
+        cache->release(block);
+
+        // advance
+        offset += BLOCK_SIZE;
+        rest -= BLOCK_SIZE;
+    }
+
+    if (rest > 0) {
+        bool modified;
+        usize idx = inode_map(NULL, inode, offset, &modified);
+        ASSERT(!modified);
+        Block *block = cache->acquire(idx);
+        DirEntry *de = (DirEntry *)block->data;
+        for (usize i = 0; i < rest / sizeof(DirEntry); i++) {
+            if (de[i].inode_no != 0) {
+                nbyte = offset + (i + 1) * sizeof(DirEntry);
+            }
+        }
+        cache->release(block);
+    }
+
+    ASSERT(nbyte <= inode->entry.num_bytes && nbyte >= 2 * sizeof(DirEntry));
+    ASSERT(nbyte % sizeof(DirEntry) == 0);
+    inode->entry.num_bytes = nbyte;
+    inodes.sync(ctx, inode, true);
+}
+
 InodeTree inodes = {
     .alloc = inode_alloc,
     .lock = inode_lock,
@@ -1021,4 +1072,5 @@ InodeTree inodes = {
     .lookup = inode_lookup,
     .insert = inode_insert,
     .remove = inode_remove,
+    .dsan = inode_dsan,
 };

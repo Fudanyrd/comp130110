@@ -1021,6 +1021,7 @@ int sys_unlink(const char *target)
             inodes.unlock(pr);
 
             // clean up
+            inodes.dsan(ctx, pr);
             inodes.put(ctx, pr);
         }
         inodes.put(ctx, ino);
@@ -1039,6 +1040,7 @@ int sys_unlink(const char *target)
         inodes.unlock(ino);
 
         // clean up
+        inodes.dsan(ctx, ino);
         inodes.put(ctx, ino);
     }
     ino = NULL;

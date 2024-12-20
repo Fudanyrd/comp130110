@@ -242,6 +242,12 @@ typedef struct {
         @throw panic if `inode` is not a directory.
      */
     void (*remove)(OpContext *ctx, Inode *inode, usize index);
+
+    /**
+     * @brief Directory Sanitizer, used by updating dirsize after unlink. 
+     * @note Must hold inode's lock, inode must point to directory.
+     */
+    void (*dsan)(OpContext *ctx, Inode *inode);
 } InodeTree;
 
 /**
