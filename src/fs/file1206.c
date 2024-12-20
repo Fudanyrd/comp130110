@@ -141,6 +141,23 @@ void file_init(OpContext *_ctx, BlockCache *_bc)
 static File *fopen(const char *path, int flags);
 static void fclose(File *fobj);
 
+// NOT IMPLEMENTED
+
+void sock_close(Socket *sock)
+{
+    return;
+}
+
+isize sock_read(Socket *sock, void *buf, usize n)
+{
+    return -1;
+}
+
+isize sock_write(Socket *sock, void *buf, usize n)
+{
+    return -1;
+}
+
 /** Returns the position after the seek. -1 if error */
 #define S_SET 0
 #define S_CUR 1
