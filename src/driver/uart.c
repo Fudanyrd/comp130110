@@ -39,7 +39,7 @@ __attribute__((weak, alias("uart_put_char"))) void putch(char);
 isize uart_read(u8 *dst, usize count)
 {
     char *d = (char *)dst;
-    for (usize i = 0; i < count; ) {
+    for (usize i = 0; i < count;) {
         *d = uart_get_char();
         if (*d == (char)-1) {
             continue;
@@ -56,7 +56,8 @@ isize uart_read(u8 *dst, usize count)
             uart_put_char(' ');
             uart_put_char('\b');
             if (i > 0) {
-                i--; d--;
+                i--;
+                d--;
             }
             continue;
         }

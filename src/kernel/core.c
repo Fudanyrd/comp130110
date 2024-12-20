@@ -38,9 +38,9 @@ NO_RETURN void kernel_entry()
     printk("Hello world! (Core %lld)\n", cpuid());
     // user_proc_test();
 
-    // before doing anything else, 
+    // before doing anything else,
     // initialize the file system first.
-    // the fs is initialized here because it need 
+    // the fs is initialized here because it need
     // some other proc to take over.
     fs_init();
     pipe_init();
@@ -68,21 +68,17 @@ NO_RETURN void kernel_entry()
     proc->ofile.ofile[1] = stdout;
     proc->ofile.ofile[2] = stderr;
 
-    char *argv[] = {
-        "/init", NULL
-    };
+    char *argv[] = { "/init", NULL };
     exec(argv[0], argv);
-    
-    // the user space is ready, now jump to the 
-    // user space via trap_ret. This should be 
-    // the only case where trap_ret happens without a 
+
+    // the user space is ready, now jump to the
+    // user space via trap_ret. This should be
+    // the only case where trap_ret happens without a
     // trap_entry.
-    asm volatile(
-        "mov sp, %0\n\t"
-        "bl trap_return"
-      :
-      : "r"(&ctx)
-    );
+    asm volatile("mov sp, %0\n\t"
+                 "bl trap_return"
+                 :
+                 : "r"(&ctx));
 
     while (1)
         yield();

@@ -3,15 +3,14 @@
 
 #include "syscall.h"
 
-int
-atoi(const char *s)
+int atoi(const char *s)
 {
-  int n;
+    int n;
 
-  n = 0;
-  while('0' <= *s && *s <= '9')
-    n = n*10 + *s++ - '0';
-  return n;
+    n = 0;
+    while ('0' <= *s && *s <= '9')
+        n = n * 10 + *s++ - '0';
+    return n;
 }
 
 #define MAKE_IP_ADDR(a, b, c, d) \

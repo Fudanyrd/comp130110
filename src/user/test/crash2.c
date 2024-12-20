@@ -1,10 +1,10 @@
 // very similar to crash, crash1,
-// but this time we try writing to 
+// but this time we try writing to
 // mmap-read pages
 
 #include "syscall.h"
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
     sys_print("crash!", 6);
     int fd = sys_open("/init", O_RDONLY);

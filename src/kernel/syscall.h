@@ -3,7 +3,8 @@
 
 #define NR_SYSCALL 512
 
-#define IS_KERNEL_ADDR(addr) (((u64)addr & 0xFFFF000000000000) == 0xFFFF000000000000)
+#define IS_KERNEL_ADDR(addr) \
+    (((u64)addr & 0xFFFF000000000000) == 0xFFFF000000000000)
 
 /** Maximum number of syscall arguments */
 #define EXE_MAX_ARGS 16

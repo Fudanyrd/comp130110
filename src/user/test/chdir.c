@@ -37,7 +37,7 @@ extern int sys_readdir(int fd, DirEntry *buf);
 extern int sys_chdir(const char *path);
 static void list(const char *path);
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
     if (sys_chdir("/home") != 0) {
         sys_print("chdir FAIL", 10);

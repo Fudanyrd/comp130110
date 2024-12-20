@@ -4,7 +4,7 @@
 #include <driver/base.h>
 #include <common/buf.h>
 
-// consider change it to 16 to support more 
+// consider change it to 16 to support more
 // file ops
 #define NQUEUE 8
 

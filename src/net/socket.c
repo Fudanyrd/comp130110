@@ -5,7 +5,7 @@ static ListNode head;
 static ListNode tail;
 static SpinLock slock;
 
-static INLINE void sock_add(Socket *sock) 
+static INLINE void sock_add(Socket *sock)
 {
     ListNode *prev = tail.prev;
     ListNode *nxt = &tail;
@@ -29,7 +29,7 @@ static INLINE void sock_rm(Socket *sock)
     nxt->prev = prev;
 }
 
-void sock_init(void) 
+void sock_init(void)
 {
     init_spinlock(&slock);
 
@@ -40,7 +40,7 @@ void sock_init(void)
     tail.prev = &head;
 }
 
-Socket *sock_open(u32 raddr, u16 lport, u16 rport) 
+Socket *sock_open(u32 raddr, u16 lport, u16 rport)
 {
     Socket *si = kalloc(sizeof(Socket));
     if (si == NULL) {
@@ -68,9 +68,9 @@ Socket *sock_open(u32 raddr, u16 lport, u16 rport)
     return si;
 }
 
-void sock_close(Socket *sock) 
+void sock_close(Socket *sock)
 {
-    ASSERT(sock!=NULL);
+    ASSERT(sock != NULL);
     // remove from list
     acquire_spinlock(&slock);
     sock_rm(sock);
@@ -86,8 +86,7 @@ void sock_close(Socket *sock)
     kfree(sock);
 }
 
-extern void net_tx_udp(struct mbuf *m, uint32 dip, uint16 sport, 
-                       uint16 dport);
+extern void net_tx_udp(struct mbuf *m, uint32 dip, uint16 sport, uint16 dport);
 isize sock_write(Socket *sock, void *buf, usize n)
 {
     struct mbuf *m;
@@ -132,8 +131,7 @@ isize sock_read(Socket *si, void *buf, usize n)
     return len;
 }
 
-void sock_recv(struct mbuf *m, uint32 raddr, uint16 lport, 
-               uint16 rport)
+void sock_recv(struct mbuf *m, uint32 raddr, uint16 lport, uint16 rport)
 {
     // the socket sleeping on this pack.
     Socket *sleeping = NULL;
@@ -142,8 +140,7 @@ void sock_recv(struct mbuf *m, uint32 raddr, uint16 lport,
     for (; it != &tail; it = it->next) {
         Socket *s = ListEntr(it, Socket, snode);
 
-        if (s->raddr == raddr && s->lport == lport && 
-            s->rport == rport) {
+        if (s->raddr == raddr && s->lport == lport && s->rport == rport) {
             sleeping = s;
             break;
         }

@@ -295,7 +295,8 @@ static void inode_sync(OpContext *ctx, Inode *inode, bool do_write)
             inode->valid = true;
         }
     }
-    ASSERT(inode->entry.type <= INODE_DEVICE && inode->entry.type >= INODE_DIRECTORY);
+    ASSERT(inode->entry.type <= INODE_DEVICE &&
+           inode->entry.type >= INODE_DIRECTORY);
 }
 
 // see `inode.h`.
@@ -465,7 +466,8 @@ static Inode *inode_share(Inode *inode)
 static void inode_put(OpContext *ctx, Inode *inode)
 {
     // TODO
-    ASSERT(inode->entry.type <= INODE_DEVICE && inode->entry.type >= INODE_DIRECTORY);
+    ASSERT(inode->entry.type <= INODE_DEVICE &&
+           inode->entry.type >= INODE_DIRECTORY);
     ASSERT(inode->rc.count > 0);
     decrement_rc(&inode->rc);
     if (inode->rc.count == 0) {

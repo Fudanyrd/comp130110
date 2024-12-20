@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 #ifndef _NET_SOCKET_
 #define _NET_SOCKET_
 
@@ -13,12 +13,12 @@ typedef struct socket {
     struct mbufq rxq; // reception queue
 
     // hold modules' lock when accessing these:
-    ListNode snode;  // socket node
+    ListNode snode; // socket node
 
     // fixed property, read only
-    u32 raddr;  // remote ip address
-    u16 lport;  // local port
-    u16 rport;  // remote portj
+    u32 raddr; // remote ip address
+    u16 lport; // local port
+    u16 rport; // remote portj
 
     // synchronization
     SpinLock lock; // lock
@@ -41,7 +41,6 @@ extern isize sock_read(Socket *sock, void *buf, usize n);
 extern isize sock_write(Socket *sock, void *buf, usize n);
 
 /** Called by irq handler. Do NOT use this. */
-extern void sock_recv(struct mbuf *m, uint32 raddr, uint16 lport, 
-                      uint16 rport);
+extern void sock_recv(struct mbuf *m, uint32 raddr, uint16 lport, uint16 rport);
 
 #endif // _NET_SOCET_

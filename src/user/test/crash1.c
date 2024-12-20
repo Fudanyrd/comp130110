@@ -1,7 +1,7 @@
 // check whether the kernel handles page fault.
 #include "syscall.h"
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
     sys_print("crash!", 6);
     int fd = sys_open("/init", O_RDONLY);

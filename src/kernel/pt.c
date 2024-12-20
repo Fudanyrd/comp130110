@@ -202,7 +202,7 @@ void free_pgdir(struct pgdir *pgdir)
         struct section *sec = list_entry(elem, struct section, node);
         ASSERT(sec->start % PAGE_SIZE == 0);
 
-        // FIXME: for writable files, 
+        // FIXME: for writable files,
         // the content may have to be written back.
         section_unmap(pgdir, sec);
         kfree(sec);
@@ -241,14 +241,14 @@ void pgdir_add_section(struct pgdir *pgdir, struct section *sec)
 }
 
 // install the page at va in src to dst.
-// based on whether the page is mutable, 
+// based on whether the page is mutable,
 // take different 'copy' approaches
-static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va, 
+static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va,
                       bool writable)
 {
     ASSERT(va % PAGE_SIZE == 0 && va != 0);
     // get the entry from src.
-    PTEntry *sentr = get_pte(src, va, false);    
+    PTEntry *sentr = get_pte(src, va, false);
     PTEntry *dentr = get_pte(dst, va, true);
     ASSERT(dentr != NULL);
 
@@ -293,7 +293,7 @@ void pgdir_clone(struct pgdir *dst, struct pgdir *src)
     if (!list_empty(l)) {
         for (; elem != list_end(l); elem = list_next(elem)) {
             struct section *s = list_entry(elem, struct section, node);
-            // make a clone of the node. 
+            // make a clone of the node.
             struct section *sec = kalloc(sizeof(struct section));
             sec->flags = s->flags;
             sec->npages = s->npages;
@@ -304,7 +304,7 @@ void pgdir_clone(struct pgdir *dst, struct pgdir *src)
             } else {
                 sec->fobj = NULL;
             }
-            
+
             // set the heap of dst.
             if (s == src->heap) {
                 dst->heap = sec;
@@ -312,7 +312,7 @@ void pgdir_clone(struct pgdir *dst, struct pgdir *src)
 
             // for each of the page, make a clone
             for (u32 i = 0; i < s->npages; i++) {
-                page_copy(dst, src, s->start + PAGE_SIZE * i, 
+                page_copy(dst, src, s->start + PAGE_SIZE * i,
                           (s->flags & PF_W) != 0);
             }
 

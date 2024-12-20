@@ -3,7 +3,8 @@
 
 #include "syscall.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     int id = sys_fork();
 
     if (id < 0) {
@@ -13,9 +14,7 @@ int main(int argc, char **argv) {
     }
     if (id == 0) {
         // child, execute shell.
-        char *argv[2] = {
-            "/bin/sh", NULL
-        };
+        char *argv[2] = { "/bin/sh", NULL };
         sys_execve(argv[0], argv);
         sys_print("start shell FAIL", 16);
         sys_exit(1);

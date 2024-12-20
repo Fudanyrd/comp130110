@@ -6,8 +6,8 @@
 
 int main(int argc, char **argv)
 {
-    void *addr = sys_mmap(NULL, 4096 * 3, PROT_READ | PROT_WRITE, 
-                          MAP_PRIVATE, -1, 0);
+    void *addr = sys_mmap(NULL, 4096 * 3, PROT_READ | PROT_WRITE, MAP_PRIVATE,
+                          -1, 0);
     if (addr == MMAP_FAILED) {
         sys_print("mmap FAIL", 9);
         return 1;

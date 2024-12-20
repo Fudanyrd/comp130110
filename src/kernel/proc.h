@@ -115,7 +115,7 @@ typedef struct Proc {
     void *kstack;
     KernelContext kcontext;
     UserContext *ucontext;
-    Inode *cwd;  // current working directory
+    Inode *cwd; // current working directory
     struct oftable ofile;
 } Proc;
 

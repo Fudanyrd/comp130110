@@ -7,8 +7,8 @@
 #include "syscall.h"
 #define CODE 0x1234
 
-int main(int argc, char **argv) {
-
+int main(int argc, char **argv)
+{
     int id = sys_fork();
     if (id < 0) {
         sys_print("fork FAIL", 9);

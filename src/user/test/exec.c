@@ -9,9 +9,7 @@ int main(int argc, char **argv)
     }
 
     if (id == 0) {
-        char *argv[5] = {
-            "/bin/echo", "foo", "bar", "baz", NULL
-        };
+        char *argv[5] = { "/bin/echo", "foo", "bar", "baz", NULL };
         sys_execve(argv[0], argv);
         sys_print("execve FAIL", 11);
         sys_exit(2);

@@ -34,7 +34,7 @@ void *kalloc_page()
 void kfree_page(void *p)
 {
     decrement_rc(&kalloc_page_cnt);
-    // check offset 
+    // check offset
     ASSERT(((u64)p & 0xffful) == 0);
 
     if (p == zero_page) {

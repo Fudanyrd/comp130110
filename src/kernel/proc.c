@@ -109,7 +109,7 @@ void init_proc(Proc *p)
     for (int i = 0; i < 16; i++) {
         p->ofile.ofile[i] = NULL;
     }
-    // warning: cwd is not initialized and should 
+    // warning: cwd is not initialized and should
     // be set either to the parent's dir or root.
 
     // init scheduler info here

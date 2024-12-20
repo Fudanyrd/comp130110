@@ -101,7 +101,7 @@ void trap_global_handler(UserContext *context)
 
     // TODO: stop killed process while returning to user space
     if (thisproc()->killed && trap_from_user(context)) {
-        // use syscall exit 
+        // use syscall exit
         context->x0 = -1;
         context->x8 = 11;
         syscall_entry(context);

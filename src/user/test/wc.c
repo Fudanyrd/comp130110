@@ -1,4 +1,4 @@
-// word count. 
+// word count.
 // print (line, word, byte)
 
 // This is needed to check the behavior of execve.
@@ -8,7 +8,8 @@
 #include "syscall.h"
 #include <stdbool.h>
 
-static void printu(int fd, u32 val) {
+static void printu(int fd, u32 val)
+{
     static char buf[16];
 
     // corner case: val == 0!
@@ -38,12 +39,14 @@ static void printu(int fd, u32 val) {
 
 static u32 line, word, byte;
 
-static void wc(int fd) {
+static void wc(int fd)
+{
     line = word = byte = 0;
 
-    bool printable(char ch) {
-        return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') 
-               || (ch >= '0' && ch <= '9');
+    bool printable(char ch)
+    {
+        return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+               (ch >= '0' && ch <= '9');
     }
 
     static char buf[512];
@@ -83,7 +86,8 @@ static void wc(int fd) {
     sys_write(1, "\n", 1);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     if (argc < 2) {
         wc(0);
     } else {
