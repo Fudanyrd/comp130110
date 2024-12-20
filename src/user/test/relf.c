@@ -172,5 +172,11 @@ int main(int argc, char **argv)
       phdr[i].p_memsz);
   }
 
+  // clear the mmaped area.
+  if (sys_munmap(map, len) != 0) {
+    sys_write(2, "munmap fail\n", 13);
+    return 1;
+  }
+
   return 0;
 }

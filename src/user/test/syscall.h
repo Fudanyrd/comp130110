@@ -210,5 +210,6 @@ typedef struct
 void *sys_mmap(void *addr, u64 length, int prot, int flags, 
                int fd, isize offset);
 
+int sys_munmap(void *addr, u64 len);
 
 #endif // _USER_SYSCALL_
