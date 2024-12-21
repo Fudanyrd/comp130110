@@ -1,4 +1,4 @@
-// this test checks the file system's read, write and 
+// this test checks the file system's read, write and
 // remove functionality. It first create a relatively
 // large file /home/tmp.txt, then write data to it.
 // Then, it tries to read from the file to make sure

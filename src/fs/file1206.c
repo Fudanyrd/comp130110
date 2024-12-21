@@ -17,12 +17,12 @@ extern Device devices[8];
 File *console;
 
 // create a device on this inode.
-static void inode_mknod(Inode *ino, u16 major, u16 minor) 
+static void inode_mknod(Inode *ino, u16 major, u16 minor)
 {
     inodes.lock(ino);
     ino->entry.type = INODE_DEVICE;
     ino->entry.num_links = 4096;
-    ino->entry.num_bytes  = -1;
+    ino->entry.num_bytes = -1;
     ino->entry.minor = minor;
     ino->entry.major = major;
     ino->rc.count = 4096;
@@ -53,7 +53,7 @@ void init_devices()
 
     // mark it as cannot remove, (pinned)
     Inode *iuart = fuart->ino;
-    inode_mknod (iuart, 0, 0);
+    inode_mknod(iuart, 0, 0);
 
     // make a zero device.
     Device zero;
@@ -66,7 +66,7 @@ void init_devices()
         printk("cannot create zero\n");
         PANIC();
     }
-    inode_mknod (fzero->ino, 0, 1);
+    inode_mknod(fzero->ino, 0, 1);
 
     // make a null device
     Device null;
@@ -79,7 +79,7 @@ void init_devices()
         printk("cannot create null\n");
         PANIC();
     }
-    inode_mknod (fnull->ino, 0, 2);
+    inode_mknod(fnull->ino, 0, 2);
 
     // do not sync. It does nothing for a device.
 
@@ -117,13 +117,14 @@ static OpContext *ctx;
 static BlockCache bcache;
 
 typedef struct proc {
-    Inode *cwd;  // current working directory
+    Inode *cwd; // current working directory
     struct oftable ofile;
 } Proc;
 
 static Proc proc;
 
-static Proc *thisproc() {
+static Proc *thisproc()
+{
     return &proc;
 }
 
@@ -141,6 +142,23 @@ void file_init(OpContext *_ctx, BlockCache *_bc)
 static File *fopen(const char *path, int flags);
 static void fclose(File *fobj);
 
+// NOT IMPLEMENTED
+
+void sock_close(Socket *sock)
+{
+    return;
+}
+
+isize sock_read(Socket *sock, void *buf, usize n)
+{
+    return -1;
+}
+
+isize sock_write(Socket *sock, void *buf, usize n)
+{
+    return -1;
+}
+
 /** Returns the position after the seek. -1 if error */
 #define S_SET 0
 #define S_CUR 1
@@ -154,7 +172,7 @@ static isize fseek(File *fobj, isize bias, int flag);
 /** Returns num bytes read from file */
 static isize fread(File *fobj, char *buf, u64 count);
 
-static isize fwrite(File* fobj, char* addr, isize n);
+static isize fwrite(File *fobj, char *addr, isize n);
 
 /** Share a file object, will have the same offset. */
 static File *fshare(File *src);
@@ -350,7 +368,7 @@ File *fopen(const char *path, int flags)
             inodes.put(NULL, ino);
             kfree(buf);
             return NULL;
-        } 
+        }
 
         // create the file.
         fino = touch_here(ino, buf);
@@ -360,6 +378,16 @@ File *fopen(const char *path, int flags)
         inodes.lock(fino);
         inodes.sync(NULL, fino, false);
         inodes.unlock(fino);
+        if ((flags & F_TRUNC) && (flags & F_WRITE) &&
+            fino->entry.type == INODE_REGULAR) {
+            // truncate the regular file
+            OpContext *ctx = kalloc(sizeof(OpContext));
+            bcache.begin_op(ctx);
+            inodes.lock(fino);
+            inodes.clear(ctx, fino);
+            inodes.unlock(fino);
+            bcache.end_op(ctx);
+        }
         inodes.put(NULL, ino);
     }
     ASSERT(fino->valid);
@@ -380,7 +408,7 @@ void fclose(File *fobj)
     case (FD_PIPE): {
         if (fobj->readable) {
             pipe_close_read(fobj->pipe);
-        } 
+        }
         if (fobj->writable) {
             pipe_close_write(fobj->pipe);
         }
@@ -388,6 +416,12 @@ void fclose(File *fobj)
     }
     case (FD_INODE): {
         inodes.put(NULL, fobj->ino);
+        break;
+    }
+    case (FD_SOCK): {
+        if (fobj->ref <= 1) {
+            sock_close(fobj->sock);
+        }
         break;
     }
     }
@@ -441,6 +475,10 @@ isize fread(File *fobj, char *buf, u64 count)
         ret = file_read(fobj, buf, count);
         break;
     }
+    case (FD_SOCK): {
+        ret = sock_read(fobj->sock, buf, count);
+        break;
+    }
     }
 
     return ret;
@@ -465,7 +503,7 @@ isize fseek(File *fobj, isize bias, int flag)
         break;
     }
     case (S_CUR): {
-        ret  = (isize)fobj->off + bias;
+        ret = (isize)fobj->off + bias;
         break;
     }
     case (S_END): {
@@ -480,7 +518,7 @@ isize fseek(File *fobj, isize bias, int flag)
 
     if (ret < 0) {
         return -1;
-    } 
+    }
 
     fobj->off = ret;
     return ret;
@@ -489,7 +527,7 @@ isize fseek(File *fobj, isize bias, int flag)
 /** Write a small batch of data to avoid large txn.
  * @param n it is suggested that n is no larger than 2048, i.e. 4 blocks.
  */
-static INLINE isize file_write_safe(OpContext *ctx, File *fobj, char *addr, 
+static INLINE isize file_write_safe(OpContext *ctx, File *fobj, char *addr,
                                     isize n)
 {
     ASSERT(n <= BLOCK_SIZE * 4);
@@ -497,7 +535,7 @@ static INLINE isize file_write_safe(OpContext *ctx, File *fobj, char *addr,
     bcache.begin_op(ctx);
 
     inodes.lock(ino);
-    // we allows write beyond the file, 
+    // we allows write beyond the file,
     // so do not check offset.
     usize incr = inodes.write(ctx, ino, (u8 *)addr, fobj->off, (usize)n);
     // update the offset
@@ -511,7 +549,7 @@ static INLINE isize file_write_safe(OpContext *ctx, File *fobj, char *addr,
 
 /** Write to an inode-based file. */
 static isize fino_write(File *fobj, char *addr, isize n)
-{    
+{
     Inode *ino = fobj->ino;
 
     // treat device somewhat differently
@@ -578,7 +616,7 @@ fiw_bad:
     return -1;
 }
 
-isize fwrite(File *fobj, char* addr, isize n)
+isize fwrite(File *fobj, char *addr, isize n)
 {
     isize ret;
     switch (fobj->type) {
@@ -590,7 +628,11 @@ isize fwrite(File *fobj, char* addr, isize n)
         ret = pipe_write(fobj->pipe, addr, n);
         break;
     }
-    default : {
+    case (FD_SOCK): {
+        ret = sock_write(fobj->sock, addr, n);
+        break;
+    }
+    default: {
         // case (FD_NONE):
         ret = -1;
         break;
@@ -618,7 +660,7 @@ int sys_mkdir(const char *path)
         // empty path name, fail
         kfree(buf);
         return -1;
-    }   
+    }
 
     // walk from start
     Inode *start = *path == '/' ? inodes.share(inodes.root) // absolute
@@ -627,7 +669,7 @@ int sys_mkdir(const char *path)
     while (*path == '/') {
         path++;
     }
-    
+
     if (*path == 0) {
         // root dir exists
         kfree(buf);
@@ -675,7 +717,7 @@ int sys_mkdir(const char *path)
     memset((void *)&dir->entry, 0, sizeof(dir->entry));
     dir->entry.num_links = 1;
     dir->entry.type = INODE_DIRECTORY;
-    
+
     // create entry in dir
     inodes.insert(ctx, dir, ".", dirno);
     inodes.insert(ctx, dir, "..", ino->inode_no);
@@ -687,7 +729,7 @@ int sys_mkdir(const char *path)
     // create entry in parent dir
     inodes.lock(ino);
     inodes.insert(ctx, ino, buf, dirno);
-    ino->entry.num_links ++;
+    ino->entry.num_links++;
     inodes.sync(ctx, ino, true);
     inodes.unlock(ino);
     inodes.put(ctx, ino);
@@ -720,7 +762,7 @@ int sys_chdir(const char *path)
         // empty path name, fail
         kfree(buf);
         return -1;
-    }   
+    }
 
     // walk from start
     Inode *start = *path == '/' ? inodes.share(inodes.root) // absolute
@@ -826,7 +868,7 @@ int sys_readdir(int fd, char *buf)
             success = true;
             break;
         }
-    }    
+    }
     inodes.unlock(ino);
 
     // seek reaches end.
@@ -884,7 +926,7 @@ isize sys_read(int fd, char *buf, usize count)
 {
     ASSERT(IS_KERNEL_ADDR(buf));
     if (fd < 0 || fd >= MAXOFILE) {
-        // invalid fd 
+        // invalid fd
         return -1;
     }
 
@@ -928,12 +970,11 @@ int sys_unlink(const char *target)
     }
     ASSERT(IS_KERNEL_ADDR(target));
 
-
     Proc *proc = thisproc();
     // walk from start
     Inode *start = *target == '/' ? inodes.share(inodes.root) // absolute
-                                  :
-                                  inodes.share(proc->cwd); // relative
+                                    :
+                                    inodes.share(proc->cwd); // relative
     while (*target == '/') {
         target++;
     }
@@ -961,7 +1002,8 @@ int sys_unlink(const char *target)
     inodes.lock(ino);
     usize no = inodes.lookup(ino, buf, NULL);
     inodes.unlock(ino);
-    kfree(buf); buf = NULL;
+    kfree(buf);
+    buf = NULL;
 
     if (no == 0) {
         // no such file or directory
@@ -1021,6 +1063,7 @@ int sys_unlink(const char *target)
             inodes.unlock(pr);
 
             // clean up
+            inodes.dsan(ctx, pr);
             inodes.put(ctx, pr);
         }
         inodes.put(ctx, ino);
@@ -1033,12 +1076,13 @@ int sys_unlink(const char *target)
         // parent dir of tgt is ino!
         inodes.lock(ino);
         ASSERT(ino->entry.num_links > 1);
-        ino->entry.num_links --;
+        ino->entry.num_links--;
         inode_rm_entry(ctx, ino, no);
         inodes.sync(ctx, ino, true);
         inodes.unlock(ino);
 
         // clean up
+        inodes.dsan(ctx, ino);
         inodes.put(ctx, ino);
     }
     ino = NULL;
@@ -1056,8 +1100,8 @@ int sys_unlink(const char *target)
 static void inode_rm_entry(OpContext *ctx, Inode *dir, usize num)
 {
     ASSERT(dir->valid);
-    ASSERT(dir->entry.type == INODE_DIRECTORY && dir->entry.num_links > 0
-           && dir->entry.num_bytes > 2 * sizeof(DirEntry));
+    ASSERT(dir->entry.type == INODE_DIRECTORY && dir->entry.num_links > 0 &&
+           dir->entry.num_bytes > 2 * sizeof(DirEntry));
 
     DirEntry entry;
     usize offset = 0;

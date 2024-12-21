@@ -61,7 +61,7 @@ extern int exec(const char *path, char **argv)
             }
         }
     }
-    
+
     // map the space for heap
     // alloc lazily. Do not do mapping.
     struct section *heap = kalloc(sizeof(struct section));
@@ -120,15 +120,15 @@ extern int exec(const char *path, char **argv)
     // push NULL.
     sp -= 0x8;
     *(char **)sp = NULL;
-    // push argv, argc. 
-    for (i --; i >= 0; i--) {
+    // push argv, argc.
+    for (i--; i >= 0; i--) {
         sp -= 0x8;
         *(u64 *)sp = addrs[i];
     }
     sp -= 8;
     *(u64 *)sp = narg;
     // must align to 16 bytes.
-    ASSERT((u64) sp % 0x10 == 0);
+    ASSERT((u64)sp % 0x10 == 0);
     // set sp to the current pointer.
     ctx->sp = STACK_START - PAGE_SIZE + (sp - (char *)stkpg);
     // set elr to the executable entry.
@@ -150,7 +150,7 @@ exec_bad:
     return -1;
 }
 
-static inline void *addr_round_down(u64 addr, u64 align) 
+static inline void *addr_round_down(u64 addr, u64 align)
 {
     return (void *)(addr - addr % align);
 }
@@ -161,14 +161,13 @@ static inline void *addr_round_up(u64 addr, u64 align)
 
 static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
 {
-
     // use jyy's static loader as a reference.
     // url: https://jyywiki.cn/pages/OS/2022/demos/loader-static.c
     // pay attention to page initialization and alignment.
 
     // protection
     PTEntry prot = PTE_USER_DATA;
-    void *start = addr_round_down(ph->p_vaddr, PAGE_SIZE); 
+    void *start = addr_round_down(ph->p_vaddr, PAGE_SIZE);
     void *end = addr_round_up(ph->p_vaddr + ph->p_memsz, PAGE_SIZE);
 
     // record in the proc's pgdir.
@@ -211,7 +210,11 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
         fread(exe, (char *)pg + ph->p_vaddr % PAGE_SIZE, tmp);
 
         // install the page
+        entr = get_pte(pd, (u64)start, true);
         *entr = K2P(pg) | PTE_USER_DATA;
+        if ((ph->p_flags & PF_W) == 0) {
+            *entr = K2P(pg) | PTE_USER_DATA | PTE_RO;
+        }
 
         // advance.
         start += PAGE_SIZE;
@@ -240,7 +243,11 @@ static int install_section(struct pgdir *pd, Elf64_Phdr *ph, File *exe)
             memset(pg + nread, 0, PAGE_SIZE - nread);
             nread = 0;
         }
+        entr = get_pte(pd, (u64)start, true);
         *entr = K2P(pg) | prot;
+        if ((ph->p_flags & PF_W) == 0) {
+            *entr = K2P(pg) | PTE_USER_DATA | PTE_RO;
+        }
 
         // advance.
         offset += PAGE_SIZE;
@@ -270,15 +277,15 @@ int fork()
 
     // user context, child's return val is 0.
     ASSERT(child->kstack != NULL && proc->ucontext != NULL);
-    UserContext *ctx = (UserContext *)(child->kstack + 
-                                       PAGE_SIZE - sizeof(UserContext));
+    UserContext *ctx =
+            (UserContext *)(child->kstack + PAGE_SIZE - sizeof(UserContext));
     memcpy(ctx, proc->ucontext, sizeof(UserContext));
     ctx->x0 = 0;
 
     // inherent the parent's cwd.
     child->cwd = inodes.share(proc->cwd);
 
-    // FIXME: inherent the parent's 
+    // FIXME: inherent the parent's
     // open file table!
     for (int i = 0; i < MAXOFILE; i++) {
         child->ofile.ofile[i] = fshare(proc->ofile.ofile[i]);

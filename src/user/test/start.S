@@ -115,3 +115,15 @@ sys_mmap:
     mov w8, #18
     svc #0
     ret
+
+.globl sys_munmap
+sys_munmap:
+    mov w8, #19
+    svc #0
+    ret
+
+.globl sys_socket
+sys_socket:
+    mov w8, #20
+    svc #0
+    ret

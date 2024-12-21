@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 
 static void opentest(void)
 {
-    int fd = sys_open("init", O_READ);
+    int fd = sys_open("/init", O_READ);
     if (fd < 0) {
         sys_print("open FAIL", 9);
         return;
@@ -50,7 +50,6 @@ static void opentest(void)
     }
     sys_print("open PASS", 9);
 }
-
 
 static void writetest(void)
 {
@@ -143,7 +142,7 @@ static void createtest(void)
     name[0] = 'a';
     name[2] = 0;
     for (int i = 0; i < 52; i++) {
-        name[1] = i + '0'; 
+        name[1] = i + '0';
         fd = sys_open(name, O_CREATE | O_READ | O_WRITE);
         if (fd < 0) {
             sys_print("open FAIL", 9);

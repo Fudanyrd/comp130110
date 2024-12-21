@@ -10,10 +10,12 @@
 #include "inode.h"
 
 #include <common/defines.h>
+#include <net/socket.h>
 
 #define F_READ 0x1
 #define F_WRITE 0x2
 #define F_CREATE 0x4
+#define F_TRUNC 0x8
 
 // maximum number of file can open by a proc.
 #define MAXOFILE (16)
@@ -27,16 +29,12 @@ extern void init_devices(void);
  -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+*/
 
 // maximum number of open files in the whole system.
-#define NFILE 65536  
+#define NFILE 65536
 
 typedef struct file {
     // type of the file.
     // Note that a device file will be FD_INODE too.
-    enum { 
-        FD_NONE = 0, 
-        FD_PIPE, 
-        FD_INODE 
-    } type;
+    enum { FD_NONE = 0, FD_PIPE, FD_INODE, FD_SOCK } type;
 
     // reference count.
     int ref;
@@ -45,15 +43,16 @@ typedef struct file {
 
     // corresponding underlying object for the file.
     union {
-        Inode* ino;
-        struct pipe* pipe;
+        Inode *ino;
+        struct pipe *pipe;
+        Socket *sock;
     };
 
     // offset of the file in bytes.
     // For a pipe, it is the number of bytes that have been written/read.
     usize off;
 
-    // reviewer may be concerned about concurrent access to 
+    // reviewer may be concerned about concurrent access to
     // off and ref. But we ensure that must hold inode's lock when
     // accessing off. Others like pipe and socket is not seekable,
     // so off is not used.
@@ -70,7 +69,7 @@ extern File *console;
 /*-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *                          File Syscalls
  -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+*/
- // NOTE: the address given to these syscall are kernel virtual address.
+// NOTE: the address given to these syscall are kernel virtual address.
 
 /** Change directory. */
 int sys_chdir(const char *path);
@@ -126,11 +125,11 @@ isize fseek(File *fobj, isize bias, int flag);
 /** Returns num bytes read from file */
 isize fread(File *fobj, char *buf, u64 count);
 
-isize fwrite(File* fobj, char* addr, isize n);
+isize fwrite(File *fobj, char *addr, isize n);
 
 /** Share a file object, will have the same offset. */
 File *fshare(File *src);
-#else 
+#else
 
 #define F_RDONLY F_READ
 #define F_WRONLY F_WRITE
@@ -142,7 +141,7 @@ File *fshare(File *src);
 // remove a dir
 static inline int sys_rmdir(const char *path)
 {
-    return sys_unlink (path);
+    return sys_unlink(path);
 }
 
 int sys_inode(int fd, InodeEntry *entr);

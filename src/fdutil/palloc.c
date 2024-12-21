@@ -12,7 +12,7 @@ struct page {
     char fre[0];
 };
 
-// use u8 to do ref count, 
+// use u8 to do ref count,
 // support at most 255 forks, which is large enough
 typedef u8 refcnt_t;
 

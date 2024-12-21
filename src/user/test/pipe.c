@@ -1,6 +1,7 @@
 #include "syscall.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     // open a pipe
     int pipfd[2];
     if (sys_pipe((int *)pipfd)) {
@@ -15,9 +16,7 @@ int main(int argc, char **argv) {
 
     if (id == 0) {
         // child
-        char *cat[] = {
-            "/bin/cat", "/home/compile.sh", NULL
-        };
+        char *cat[] = { "/bin/cat", "/home/compile.sh", NULL };
 
         sys_dup2(pipfd[1], 1);
         sys_close(pipfd[0]);
@@ -27,7 +26,8 @@ int main(int argc, char **argv) {
     } else {
         // parent
         char *wc[] = {
-            "/bin/wc", NULL,
+            "/bin/wc",
+            NULL,
         };
 
         sys_dup2(pipfd[0], 0);

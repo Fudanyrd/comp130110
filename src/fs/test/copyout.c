@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <assert.h>
 
-
 // clang-format off
 /**
  * Make a 8MB disk, that is 16K blocks!

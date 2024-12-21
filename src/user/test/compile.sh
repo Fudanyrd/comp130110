@@ -2,6 +2,14 @@
 # compile all user programs and tests, then put in
 # the build directory and disk image.
 
+### General configurations. ###
+build=../../../mkfs
+home=$( ./home.sh )
+tests="init"
+CC=gcc
+LD=ld
+CFLAGS="-static -ffreestanding -O3 -fno-plt -fno-pic -mgeneral-regs-only"
+
 uprog=$( ./uprog.sh )
 if [[ $# -ne 1 ]]; then
 	echo "No test cases specified. Use default uprog.sh" 2>&1
@@ -9,29 +17,41 @@ else
 	uprog=$( $1 )
 fi
 
-ls init.c
+ls init.c > /dev/null 2>&1
 if [[ $? -ne 0 ]]; then
     echo "init.c not found, required."
     exit 1
 fi
 
-ls sh.c
+ls sh.c > /dev/null 2>&1
 if [[ $? -ne 0 ]]; then
     echo "sh.c not found, required."
     exit 1
 fi
 
-build=../../../mkfs
-home=$( ./home.sh )
-tests="init"
-cflags="-static -ffreestanding -O3 -fno-plt -fno-pic -mgeneral-regs-only"
+check() {
+    echo "Checking $1 usability..."
+    $1 -v > /dev/null 2>&1
+    if [[ $? -ne 0 ]]; then
+        echo "$1 not usable. Abort" 1>&2
+        exit 1
+    fi
+    echo "OK"
+}
+
+check $CC
+check $LD
 
 echo "Building start.o..."
-gcc $cflags -c start.S -o start.o
+$CC $CFLAGS -c start.S -o start.o
+if [[ $? -ne 0 ]]; then
+    echo "Build start.o exited with $?. Abort" 1>&2
+    exit 1
+fi
 
 for up in $uprog; do
     echo "Buiding user program $up..."
-    gcc $cflags -c $up.c -o $up.o && ld start.o $up.o -o $up
+    $CC $CFLAGS -c $up.c -o $up.o && $LD start.o $up.o -o $up
     if [[ $? -ne 0 ]]; then
         echo "Abort" 1>&2
         exit 1
@@ -42,7 +62,7 @@ done
 
 for up in $tests; do
     echo "Buiding test program $up..."
-    gcc $cflags -c $up.c -o $up.o && ld start.o $up.o -o $up
+    $CC $CFLAGS -c $up.c -o $up.o && $LD start.o $up.o -o $up
     if [[ $? -ne 0 ]]; then
         echo "Abort" 1>&2
         exit 1

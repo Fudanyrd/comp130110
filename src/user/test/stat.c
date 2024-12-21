@@ -1,7 +1,16 @@
 #include "syscall.h"
 
-static void printu(int fd, u32 val) {
+static void printu(int fd, u32 val)
+{
     static char buf[16];
+    // corner case
+    if (val == 0) {
+        buf[0] = '0';
+        buf[1] = 0;
+        sys_write(fd, buf, 2);
+        return;
+    }
+
     int n = 0;
     while (val > 0) {
         buf[n++] = '0' + val % 10;
@@ -19,7 +28,8 @@ static void printu(int fd, u32 val) {
     sys_write(fd, buf, n + 1);
 }
 
-static void fdstat(int fd) {
+static void fdstat(int fd)
+{
     static InodeEntry entry;
     if (sys_fstat(fd, &entry) != 0) {
         sys_write(1, "stat fail\n", 10);
@@ -46,15 +56,21 @@ static void fdstat(int fd) {
     }
     }
 
-    // size 
+    // size
+    sys_write(1, "size: ", 7);
     printu(1, entry.num_bytes);
     // nlink
+    sys_write(1, "link: ", 7);
     printu(1, (u32)entry.num_links);
+    // inode no
+    sys_write(1, "inode: ", 8);
+    printu(1, entry.inode_no);
 
     sys_write(1, "\n", 1);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     for (int i = 1; i < argc; i++) {
         int fd = sys_open(argv[i], O_READ);
         if (fd < 0) {

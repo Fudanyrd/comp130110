@@ -129,7 +129,8 @@ static void bitmap_set(uint64_t *buf, usize idx)
     buf[offset] |= (1UL << (idx % BIT_PER_ELEM));
 }
 
-static Inode *file2inode(const char *fname) {
+static Inode *file2inode(const char *fname)
+{
     Inode *rt = inodes.root;
     inodes.sync(NULL, rt, false);
     assert(rt->valid);

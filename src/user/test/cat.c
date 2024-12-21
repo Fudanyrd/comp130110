@@ -11,7 +11,7 @@ extern int sys_close(int fd);
 extern long sys_read(int fd, char *buf, unsigned long size);
 extern long sys_write(int fd, const char *buf, unsigned long size);
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
     if (argc == 1) {
         cat(0);
@@ -40,4 +40,3 @@ static void cat(int fd)
     }
     return;
 }
-

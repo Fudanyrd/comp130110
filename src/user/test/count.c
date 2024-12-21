@@ -2,15 +2,15 @@
 
 static char counter = 'a';
 
-void child_fn() 
+void child_fn()
 {
-    char message[] = {'[', 'c', 'h', 'i', 'l', 'd', ']', ' ', 0};
+    char message[] = { '[', 'c', 'h', 'i', 'l', 'd', ']', ' ', 0 };
     message[8] = counter;
     sys_print((char *)message, 9);
     sys_exit(0);
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
     sys_print("[parent] 0", 11);
 

@@ -32,7 +32,8 @@ void interrupt_global_handler()
     u32 intid = iar & 0x3ff;
 
     if (intid == 1023) {
-        printk("[Warning]: Spurious Interrupt.\n");
+        // be quiet, please!
+        // printk("[Warning]: Spurious Interrupt.\n");
         return;
     }
 

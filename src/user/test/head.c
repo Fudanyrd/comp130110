@@ -1,16 +1,15 @@
 // low-profile head:
-// read the first several bytes from stdin 
+// read the first several bytes from stdin
 #include "syscall.h"
 
-static long 
-atoi(const char *s)
+static long atoi(const char *s)
 {
-  long n;
+    long n;
 
-  n = 0;
-  while('0' <= *s && *s <= '9')
-    n = n * 10 + *s++ - '0';
-  return n;
+    n = 0;
+    while ('0' <= *s && *s <= '9')
+        n = n * 10 + *s++ - '0';
+    return n;
 }
 
 int main(int argc, char **argv)

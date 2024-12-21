@@ -6,7 +6,7 @@
 #define MMAP_MAX_ADDR 0xb0000000
 
 // return value
-#define MMAP_FAILED ((u64)-1)
+#define MMAP_FAILED ((u64) - 1)
 
 // prots
 
@@ -20,12 +20,11 @@
 #define MAP_FIXED 2
 
 // mmap syscall executor
-u64 mmap(void *addr, u64 length, int prot, int flags, 
-           int fd, isize offset);
+u64 mmap(void *addr, u64 length, int prot, int flags, int fd, isize offset);
 
 int munmap(void *addr, u64 length);
 
-// kernel helper methods. 
+// kernel helper methods.
 
 /** Destroy page mapping according to sec. Will NOT free sec.
  * @return 0 if successful.
@@ -33,7 +32,7 @@ int munmap(void *addr, u64 length);
 extern int section_unmap(struct pgdir *pd, struct section *sec);
 
 // return the section that guards uva.
-// null if not found. 
+// null if not found.
 extern struct section *section_search(struct pgdir *pd, u64 uva);
 
 // fetch missing page at uva.

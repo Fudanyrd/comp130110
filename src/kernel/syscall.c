@@ -7,6 +7,7 @@
 #include <common/string.h>
 #include <test/test.h>
 #include <aarch64/intrinsic.h>
+#include <net/syscall.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Woverride-init"
@@ -35,11 +36,13 @@ void syscall_pipe(UserContext *ctx);
 void syscall_dup2(UserContext *ctx);
 void syscall_sbrk(UserContext *ctx);
 void syscall_mmap(UserContext *ctx);
+void syscall_munmap(UserContext *ctx);
+void syscall_socket(UserContext *ctx);
 
 /** Page table helper methods. */
 
 void *syscall_table[NR_SYSCALL] = {
-    [0]  = NULL,
+    [0] = NULL,
     [1] = (void *)syscall_print,
     [2] = (void *)syscall_open,
     [3] = (void *)syscall_close,
@@ -58,7 +61,9 @@ void *syscall_table[NR_SYSCALL] = {
     [16] = (void *)syscall_dup2,
     [17] = (void *)syscall_sbrk,
     [18] = (void *)syscall_mmap,
-    [19 ... NR_SYSCALL - 1] = NULL,
+    [19] = (void *)syscall_munmap,
+    [20] = (void *)syscall_socket,
+    [21 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -79,9 +84,9 @@ void syscall_entry(UserContext *context)
     }
     default: {
         // function that executes the syscall
-        syscall_fn fn = syscall_table[id]; 
+        syscall_fn fn = syscall_table[id];
         fn(context);
-        // printk("[KERNEL] pid %d syscall id %lld return %lld\n", 
+        // printk("[KERNEL] pid %d syscall id %lld return %lld\n",
         // thisproc()->pid, id, context->x0);
         break;
     }
@@ -141,7 +146,7 @@ isize copyin(struct pgdir *pd, void *ka, u64 va, u64 size)
             return -1;
         }
 
-        void *src = (void *)(*entr & (~0xfffUL)); 
+        void *src = (void *)(*entr & (~0xfffUL));
         src = (void *)P2K(src);
         src += va % PAGE_SIZE;
         memcpy(ka, src, ncp);
@@ -168,18 +173,23 @@ isize copyout(struct pgdir *pd, void *ka, u64 va, u64 size)
         ncp = ncp > size ? size : ncp;
 
         PTEntry *entr = get_pte(pd, va, false);
-        if (entr == NULL || *entr == 0) {
+        // this may be:
+        // (a) a lazily mapped page;
+        // (b) a Copy-on-Write page;
+        if (entr == NULL || *entr == 0 || *entr & PTE_RO) {
+            // for COW page, section_install() will
+            // duplicate it and mark it as writable.
             install_page(pd, va);
             entr = get_pte(pd, va, false);
         }
-        if (entr == NULL || *entr == 0) {
+        if (entr == NULL || *entr == 0 || *entr & PTE_RO) {
             // error
             printk("User program %d segfault! Killed\n", thisproc()->pid);
             thisproc()->killed = true;
             return -1;
         }
 
-        void *src = (void *)(*entr & (~0xfffUL)); 
+        void *src = (void *)(*entr & (~0xfffUL));
         src = (void *)P2K(src);
         src += va % PAGE_SIZE;
         memcpy(src, ka, ncp);
@@ -214,12 +224,12 @@ extern isize copyinstr(struct pgdir *pd, void *ka, u64 va)
             return -1;
         }
 
-        void *src = (void *)(*entr & (~0xfffUL)); 
+        void *src = (void *)(*entr & (~0xfffUL));
         src = (void *)P2K(src);
         src += va % PAGE_SIZE;
 
         for (usize i = 0; i < ncp; i++) {
-            *(char *)ka = *(char *)src; 
+            *(char *)ka = *(char *)src;
             // advance
             if (*(char *)ka == 0) {
                 break;
@@ -244,7 +254,7 @@ extern isize copyinstr(struct pgdir *pd, void *ka, u64 va)
 
 void syscall_open(UserContext *ctx)
 {
-    // note: 
+    // note:
     // int sys_open(const char *path, int flags);
     char *buf = kalloc_page();
     copyinstr(&thisproc()->pgdir, buf, ctx->x0);
@@ -267,7 +277,7 @@ void syscall_readdir(UserContext *ctx)
     DirEntry *dir = kalloc(sizeof(DirEntry));
     int ret = sys_readdir((int)ctx->x0, (char *)dir);
     u64 uva = ctx->x1;
-    if (ret >= 0 && 
+    if (ret >= 0 &&
         copyout(&thisproc()->pgdir, dir, uva, sizeof(DirEntry)) != 0) {
         ret = -1;
     }
@@ -357,7 +367,7 @@ void syscall_mkdir(UserContext *ctx)
     if (copyinstr(pd, buf, ctx->x0) != 0) {
         ctx->x0 = -1;
         kfree_page(buf);
-        return; 
+        return;
     }
     ctx->x0 = sys_mkdir(buf);
     kfree_page(buf);
@@ -485,7 +495,7 @@ void syscall_wait(UserContext *ctx)
 void syscall_execve(UserContext *ctx)
 {
     struct pgdir *pd = &thisproc()->pgdir;
-    // return value 
+    // return value
     int ret = 0;
     // name of executable
     char *ename = kalloc_page();
@@ -510,7 +520,7 @@ void syscall_execve(UserContext *ctx)
 
     // copy argv from user space
     u64 narg = 0;
-    for (u64 va = ctx->x1; ;va += sizeof(void *)) {
+    for (u64 va = ctx->x1;; va += sizeof(void *)) {
         u64 uvaddr;
         if (copyin(pd, (void *)&uvaddr, va, sizeof(uvaddr)) != 0) {
             ret = -1;
@@ -542,7 +552,7 @@ exe_bad1:
     kfree(argv);
 exe_bad2:
     kfree_page(ename);
-exe_bad: 
+exe_bad:
     ctx->x0 = ret;
     return;
 }
@@ -563,15 +573,18 @@ void syscall_fstat(UserContext *ctx)
     if (copyout(&proc->pgdir, &ino->entry, ctx->x1, sizeof(InodeEntry)) != 0) {
         goto fstat_bad;
     }
+    u32 no = ino->inode_no;
+    copyout(&proc->pgdir, &no, ctx->x1 + 12, sizeof(no));
 
     ctx->x0 = 0;
     return;
 fstat_bad:
     ctx->x0 = -1;
-    return;    
+    return;
 }
 
-static int alloc_fd(int start) {
+static int alloc_fd(int start)
+{
     Proc *p = thisproc();
 
     int i = 0;
@@ -674,17 +687,19 @@ void syscall_sbrk(UserContext *ctx)
     u64 end = round_up(start + grow, PAGE_SIZE);
     for (; start < end; start += PAGE_SIZE) {
         // install a page at virtual address start.
-        void *page = kalloc_page();
-        if (page == NULL) {
-            // cannot alloc
-            break;
-        }
+        void *page = kalloc_zero();
+        ASSERT(page != NULL);
         memset(page, 0, PAGE_SIZE);
 
         // install page
         PTEntry *pte = get_pte(pd, start, true);
         *pte = K2P(page);
         *pte |= PTE_USER_DATA;
+
+        // mark as read-only,
+        // when the user writes it,
+        // it will be duped.
+        *pte = *pte | PTE_RO;
 
         // advance.
         heap->npages++;
@@ -697,14 +712,25 @@ void syscall_sbrk(UserContext *ctx)
 
 void syscall_mmap(UserContext *ctx)
 {
-    ctx->x0 = mmap((void *)ctx->x0, ctx->x1, ctx->x2, ctx->x3, 
-                   ctx->x4, ctx->x5);
+    ctx->x0 =
+            mmap((void *)ctx->x0, ctx->x1, ctx->x2, ctx->x3, ctx->x4, ctx->x5);
+    return;
+}
+
+void syscall_munmap(UserContext *ctx)
+{
+    ctx->x0 = munmap((void *)ctx->x0, ctx->x1);
+    return;
+}
+
+void syscall_socket(UserContext *ctx)
+{
+    ctx->x0 = sys_socket(ctx->x0, ctx->x1, ctx->x2);
     return;
 }
 
 static int install_page(struct pgdir *pd, u64 faddr)
 {
-
     struct section *sec = section_search(pd, faddr);
     if (sec == NULL) {
         // fail
