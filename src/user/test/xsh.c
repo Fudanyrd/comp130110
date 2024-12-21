@@ -196,14 +196,50 @@ char *strchr(const char *s, char c)
     return 0;
 }
 
+static struct {
+    char buf[256];    
+    u32 nrd; // readptr.
+    u32 nwrt; // write ptr.
+} console;
+
+char getch() 
+{
+    if (console.nrd == console.nwrt) {
+        console.nrd = console.nwrt = 0;
+        long nr = read(0, console.buf, sizeof(console.buf));
+        if (nr <= 0) {
+            // EOF
+            return (char)-1;
+        }
+        console.nwrt += nr;
+    }
+
+    char ret = console.buf[console.nrd % sizeof(console.buf)];
+    console.nrd ++;
+    return ret;
+}
+
 char *gets(char *buf, int max)
 {
     // the console implementation
     // on this OS naturally satisfy that
     // buf ends with '\n'.
-    int cc = read(0, buf, max);
-    buf[cc] = 0;
-    return buf;
+    // but not the case for regular files.
+    char ch = getch();
+    char *start = buf;
+    while (ch != (char)-1) {
+        *buf = ch;
+        if (*buf == '\n') {
+            buf[1] = 0;
+            return start;
+        }
+        buf++;
+        ch = getch();
+    }
+
+    // EOF is met.
+    *start = 0;
+    return start;
 }
 
 // FIXME: stat removed
@@ -461,6 +497,7 @@ int main(void)
     sys_sbrk(HEAP);
     // init allocator
     malloc_init();
+    console.nrd = console.nwrt = 0;
 
     static char buf[100];
     int fd;
