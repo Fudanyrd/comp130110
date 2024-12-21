@@ -197,12 +197,12 @@ char *strchr(const char *s, char c)
 }
 
 static struct {
-    char buf[256];    
+    char buf[256];
     u32 nrd; // readptr.
     u32 nwrt; // write ptr.
 } console;
 
-char getch() 
+char getch()
 {
     if (console.nrd == console.nwrt) {
         console.nrd = console.nwrt = 0;
@@ -215,7 +215,7 @@ char getch()
     }
 
     char ret = console.buf[console.nrd % sizeof(console.buf)];
-    console.nrd ++;
+    console.nrd++;
     return ret;
 }
 

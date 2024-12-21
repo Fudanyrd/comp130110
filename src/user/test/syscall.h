@@ -67,10 +67,11 @@ typedef struct dinode {
     u32 num_bytes; // number of bytes in the file, i.e. the size of file.
 
     /** The following is not used in user space. */
-    u32 addrs[INODE_NUM_DIRECT]; // direct addresses/block numbers.
-    u32 indirect; // the indirect address block.
-    u32 dindirect; // doubly-indirect address block
+    u32 inode_no; // inode number
+    u32 addrs[12]; // unused
 } InodeEntry;
+
+#define InodeEntrySize sizeof(InodeEntry)
 
 // directory entry. `inode_no == 0` implies this entry is free.
 // the maximum length of file names, including trailing '\0'.
