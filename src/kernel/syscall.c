@@ -573,6 +573,8 @@ void syscall_fstat(UserContext *ctx)
     if (copyout(&proc->pgdir, &ino->entry, ctx->x1, sizeof(InodeEntry)) != 0) {
         goto fstat_bad;
     }
+    u32 no = ino->inode_no;
+    copyout(&proc->pgdir, &no, ctx->x1 + 12, sizeof(no));
 
     ctx->x0 = 0;
     return;
