@@ -27,7 +27,7 @@ get_property(kernel_image GLOBAL PROPERTY kernel_image_path)
 get_property(sd_image GLOBAL PROPERTY sd_image_path)
 
 set(qemu_flags
-    -machine virt,gic-version=3
+    -machine virt,gic-version=3,highmem-ecam=off
     -cpu cortex-a72
     -smp 4
     -m 4096
@@ -79,6 +79,14 @@ add_custom_target(debug
             -ex "file ${kernel_elf}"
             -ex "target remote localhost:1234"
     DEPENDS kernel)
+
+# script for running qemu.
+add_custom_target(script
+    COMMAND echo \"\#!/usr/bin/bash\" > debug.sh &&
+            echo \"\#Auto Generated. Don\'t Modify.\" >> debug.sh &&
+            make -n qemu | grep \"qemu-system-aarch64\" | sed -r \"s/ -/ \\\\\\\\\\n\\t-/g\" >> debug.sh &&
+            chmod +x debug.sh
+)
 
 # if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
 # 	add_custom_target(init_libc
