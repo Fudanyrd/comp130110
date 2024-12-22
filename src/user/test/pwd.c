@@ -87,8 +87,8 @@ static void Chdir(const char *path)
 
 static u64 strlen(const char *name)
 {
-    char *old = name;
-    for (; *name != 0; *name++) {
+    const char *old = name;
+    for (; *name != 0; name++) {
     }
 
     return (name - old);

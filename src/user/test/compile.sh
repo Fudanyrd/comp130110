@@ -4,11 +4,29 @@
 
 ### General configurations. ###
 build=../../../mkfs
+tooldir=../../fs/test/build/
+
+# create install dir if not exist.
+ls $build > /dev/null 2>&1
+if [[ $? -ne 0 ]]; then
+    mkdir -p $build
+fi
+
+ls $build/copyin > /dev/null 2>&1
+if [[ $? -ne 0 ]]; then
+    cp $tooldir/copyin $build/copyin
+    cp $tooldir/copyout $build/copyout
+fi
+
 home=$( ./home.sh )
 tests="init"
-CC=gcc
-LD=ld
-CFLAGS="-static -ffreestanding -O3 -fno-plt -fno-pic -mgeneral-regs-only"
+
+### Toolchain
+CROSS=""
+CC="$CORSS"gcc
+LD="$CROSS"ld
+STRIP="$CROSS"strip
+CFLAGS="-static -ffreestanding -O3 -fno-plt -fno-pic -mgeneral-regs-only -Wall -Werror"
 
 uprog=$( ./uprog.sh )
 if [[ $# -ne 1 ]]; then
@@ -56,7 +74,7 @@ for up in $uprog; do
         echo "Abort" 1>&2
         exit 1
     fi
-	strip $up
+	$STRIP $up
     mv $up $build/$up
 done
 
@@ -67,12 +85,12 @@ for up in $tests; do
         echo "Abort" 1>&2
         exit 1
     fi
-	strip $up # stripped executable
+	$STRIP $up # stripped executable
     mv $up $build/$up
 done
 
 for file in $home; do
-    link $file $build/$file
+    link $file $build/$file > /dev/null 2>&1
 done
 
 # clean
