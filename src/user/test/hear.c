@@ -1,4 +1,4 @@
-// hear: 
+// hear:
 // listening from port, print any incoming message to
 // the console. This program will not exit unless the
 // socket is broken.
@@ -7,7 +7,7 @@
 
 #ifndef MAXCOUNT
 #define MAXCOUNT 20
-#endif 
+#endif
 
 int atoi(const char *s)
 {
