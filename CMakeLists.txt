@@ -37,10 +37,10 @@ set(qemu_flags
     -global virtio-mmio.force-legacy=false
     -drive file=${sd_image},if=none,format=raw,id=d0
     -device virtio-blk-device,drive=d0,bus=virtio-mmio-bus.0
+    -netdev user,id=net0,hostfwd=udp::25999-:2000 -object filter-dump,id=net0,netdev=net0,file=packets.pcap
+    -device e1000,netdev=net0,bus=pcie.0
     -kernel "${kernel_elf}")
 
-# -netdev user,id=net0,hostfwd=udp::25999-:2000 -object filter-dump,id=net0,netdev=net0,file=packets.pcap
-# -device e1000,netdev=net0,bus=pcie.0
 
 message(STATUS "Path to Disk Image: ${sd_image}")
 
