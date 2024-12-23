@@ -244,8 +244,9 @@ void pgdir_add_section(struct pgdir *pgdir, struct section *sec)
 // based on whether the page is mutable,
 // take different 'copy' approaches
 static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va,
-                      bool writable)
+                      int flags)
 {
+    bool writable = (flags & PF_W) != 0;
     ASSERT(va % PAGE_SIZE == 0 && va != 0);
     // get the entry from src.
     PTEntry *sentr = get_pte(src, va, false);
@@ -273,6 +274,16 @@ static void page_copy(struct pgdir *dst, struct pgdir *src, u64 va,
     void *shared = (void *)(P2K(*sentr & (~0xffful)));
     // page for dst pgdir.
     void *dup = kshare_page(shared);
+
+    // if the page is shared.
+    bool is_shared = (flags & PF_S) != 0;
+    if (is_shared) {
+        // just create the mapping.
+        // don't care about anything else.
+        *dentr = *sentr;
+        return;
+    }
+
     if (shared == dup) {
         *sentr |= PTE_RO;
         *dentr = *sentr;
@@ -313,7 +324,7 @@ void pgdir_clone(struct pgdir *dst, struct pgdir *src)
             // for each of the page, make a clone
             for (u32 i = 0; i < s->npages; i++) {
                 page_copy(dst, src, s->start + PAGE_SIZE * i,
-                          (s->flags & PF_W) != 0);
+                          s->flags);
             }
 
             // add to the list of dst
