@@ -59,8 +59,8 @@ u64 mmap(void *addr, u64 length, int prot, int flags, int fd, isize offset)
             kfree(sec);
             return MMAP_FAILED;
         }
-        if ((flags & MAP_PRIVATE) == 0 && !fobj->writable 
-            && (prot & PROT_WRITE)) {
+        if ((flags & MAP_PRIVATE) == 0 && !fobj->writable &&
+            (prot & PROT_WRITE)) {
             // don't allow shared map of a read-only file.
             kfree(sec);
             return MMAP_FAILED;
@@ -152,12 +152,13 @@ int section_unmap(struct pgdir *pd, struct section *sec)
             ASSERT((*pte & PTE_PAGE) == PTE_PAGE);
             u64 pg = P2K(*pte & (~0xffful));
 
-            if ((sec->flags & PF_S) && (sec->flags & PF_F) 
-                && (sec->flags & PF_W)) {
+            if ((sec->flags & PF_S) && (sec->flags & PF_F) &&
+                (sec->flags & PF_W)) {
                 // must write back
                 ASSERT(sec->fobj->type == FD_INODE);
                 Inode *ino = sec->fobj->ino;
-                inode_write_at(ino, (void *)pg, sec->offset + (addr - sec->start));
+                inode_write_at(ino, (void *)pg,
+                               sec->offset + (addr - sec->start));
             }
 
             kfree_page((void *)pg);

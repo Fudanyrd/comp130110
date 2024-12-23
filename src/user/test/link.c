@@ -18,10 +18,8 @@ int main(int argc, char **argv)
     return 0;
 }
 
-asm (
-    ".globl link\n\t"
+asm(".globl link\n\t"
     "link:\n\t"
     "mov w8, #21\n\t"
     "svc #0\n\t"
-    "ret\n"
-);
+    "ret\n");

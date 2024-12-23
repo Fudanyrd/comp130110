@@ -134,7 +134,7 @@ static void mmaptest()
     // test map dirty.
     write(1, "Test Dirty\n", 12);
     fd = open(f, O_READ | O_WRITE);
-    if ( fd < 0 ) {
+    if (fd < 0) {
         write(2, "mmaptest: open\n", 16);
     }
 
@@ -151,7 +151,7 @@ static void mmaptest()
 
     // check that the file is changed.
     fd = open(f, O_READ | O_WRITE);
-    for (int i = 0 ; i < sizeof(buf); i++) {
+    for (int i = 0; i < sizeof(buf); i++) {
         char b;
         if (read(fd, &b, 1) != 1) {
             write(2, "mmaptest: read\n", 16);
@@ -178,8 +178,10 @@ static void mmaptest()
         exit(1);
     }
 
-    void *p1 = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd1, 0);
-    void *p2 = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd2, 0);
+    void *p1 =
+            mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd1, 0);
+    void *p2 =
+            mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd2, 0);
     if (strcmp("12345", p1) != 0) {
         write(2, "mmaptest: map fd1\n", 19);
         exit(1);
@@ -231,6 +233,7 @@ static void forktest()
     }
 
     sys_wait(&id);
-    _v1(p1); _v1(p2);
+    _v1(p1);
+    _v1(p2);
     write(1, "Fork PASS\n", 11);
 }

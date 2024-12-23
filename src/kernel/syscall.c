@@ -740,7 +740,7 @@ void syscall_link(UserContext *ctx)
     }
 
     struct pgdir *pd = &thisproc()->pgdir;
-    if (copyinstr(pd, oldpth, ctx->x0) != 0 || 
+    if (copyinstr(pd, oldpth, ctx->x0) != 0 ||
         copyinstr(pd, newpth, ctx->x1) != 0) {
         kfree_page(oldpth);
         kfree_page(newpth);
