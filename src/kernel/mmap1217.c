@@ -47,6 +47,10 @@ u64 mmap(void *addr, u64 length, int prot, int flags, int fd, isize offset)
     sec->flags |= (prot & PROT_READ);
     sec->flags |= (prot & PROT_WRITE);
     sec->flags |= (prot & PROT_EXEC);
+    if ((flags & MAP_PRIVATE) == 0) {
+        // map shared.
+        sec->flags |= PF_S;
+    }
 
     File *fobj;
     if (fd >= 0 && fd < MAXOFILE && (fobj = ofile[fd]) != NULL) {
@@ -55,6 +59,13 @@ u64 mmap(void *addr, u64 length, int prot, int flags, int fd, isize offset)
             kfree(sec);
             return MMAP_FAILED;
         }
+        if ((flags & MAP_PRIVATE) == 0 && !fobj->writable &&
+            (prot & PROT_WRITE)) {
+            // don't allow shared map of a read-only file.
+            kfree(sec);
+            return MMAP_FAILED;
+        }
+
         Inode *ino = fobj->ino;
         ASSERT(ino->valid);
         if (ino->entry.type != INODE_REGULAR) {
@@ -105,6 +116,26 @@ static void *find_mmap_addr(struct pgdir *pd, u64 len)
     return NULL;
 }
 
+// write a page's data into inode.
+static void inode_write_at(Inode *ino, void *page, usize off)
+{
+    OpContext *ctx = kalloc(sizeof(OpContext));
+    inodes.lock(ino);
+
+    // write 2048B
+    bcache.begin_op(ctx);
+    inodes.write(ctx, ino, page, off, PAGE_SIZE / 2);
+    bcache.end_op(ctx);
+
+    // another 2048B
+    off += PAGE_SIZE / 2;
+    bcache.begin_op(ctx);
+    inodes.write(ctx, ino, page, off, PAGE_SIZE / 2);
+    bcache.end_op(ctx);
+    inodes.unlock(ino);
+    kfree(ctx);
+}
+
 int section_unmap(struct pgdir *pd, struct section *sec)
 {
     ASSERT(pd != NULL && sec != NULL);
@@ -118,8 +149,21 @@ int section_unmap(struct pgdir *pd, struct section *sec)
         // we accept pte to be NULL
         // since mmap does lazy mmaping.
         if (pte != NULL && *pte != 0) {
+            ASSERT((*pte & PTE_PAGE) == PTE_PAGE);
             u64 pg = P2K(*pte & (~0xffful));
+
+            if ((sec->flags & PF_S) && (sec->flags & PF_F) &&
+                (sec->flags & PF_W)) {
+                // must write back
+                ASSERT(sec->fobj->type == FD_INODE);
+                Inode *ino = sec->fobj->ino;
+                inode_write_at(ino, (void *)pg,
+                               sec->offset + (addr - sec->start));
+            }
+
             kfree_page((void *)pg);
+            // clear mapping.
+            *pte = 0;
         }
     }
 
@@ -226,6 +270,7 @@ struct section *section_search(struct pgdir *pd, u64 uva)
 int section_install(struct pgdir *pd, struct section *sec, u64 uva)
 {
     ASSERT(pd != NULL && sec != NULL);
+    uva -= (uva % PAGE_SIZE);
     PTEntry *pte = get_pte(pd, uva, true);
     if (pte == NULL) {
         return -1;
@@ -256,6 +301,7 @@ int section_install(struct pgdir *pd, struct section *sec, u64 uva)
     if (pg == NULL) {
         return -1;
     }
+    memset(pg, 0, PAGE_SIZE);
 
     // init page.
     if (sec->flags & PF_F) {
@@ -265,9 +311,6 @@ int section_install(struct pgdir *pd, struct section *sec, u64 uva)
         inodes.lock(ino);
         inodes.read(ino, pg, off, PAGE_SIZE);
         inodes.unlock(ino);
-    } else {
-        // zero-init
-        memset(pg, 0, PAGE_SIZE);
     }
 
     pte = get_pte(pd, uva, true);

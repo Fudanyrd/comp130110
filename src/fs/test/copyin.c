@@ -9,6 +9,8 @@
 #include <assert.h>
 #include <fs/file1206.h>
 
+extern int sys_create(const char *path, int flags);
+
 // clang-format off
 /**
  * Make a 16MB disk, that is 32K blocks, allows multilevel 
@@ -233,6 +235,11 @@ static void add_file()
 
             sys_close(dfd);
             close(fd);
+            break;
+        }
+        case 'l': {
+            // create hard links.
+            printf("%d\n", sys_link(dst, src));
             break;
         }
         default: {

@@ -783,13 +783,13 @@ int sys_chdir(const char *path)
 
     // start walking
     Inode *ino = walk(start, path, buf);
-    ASSERT(ino->valid);
-    ASSERT(*buf != '/');
     if (ino == NULL) {
         // fail
         kfree(buf);
         return -1;
     }
+    ASSERT(ino->valid);
+    ASSERT(*buf != '/');
 
     inodes.lock(ino);
     usize dno = inodes.lookup(ino, buf, NULL);
@@ -999,8 +999,9 @@ int sys_unlink(const char *target)
     }
 
     // number of dest inode
+    usize idx = 0;
     inodes.lock(ino);
-    usize no = inodes.lookup(ino, buf, NULL);
+    usize no = inodes.lookup(ino, buf, &idx);
     inodes.unlock(ino);
     kfree(buf);
     buf = NULL;
@@ -1076,8 +1077,8 @@ int sys_unlink(const char *target)
         // parent dir of tgt is ino!
         inodes.lock(ino);
         ASSERT(ino->entry.num_links > 1);
+        inodes.remove(ctx, ino, idx);
         ino->entry.num_links--;
-        inode_rm_entry(ctx, ino, no);
         inodes.sync(ctx, ino, true);
         inodes.unlock(ino);
 
@@ -1153,4 +1154,137 @@ File *fshare(File *src)
     }
     }
     return src;
+}
+
+int sys_link(const char *oldpath, const char *newpath)
+{
+    ASSERT(IS_KERNEL_ADDR(oldpath));
+    ASSERT(IS_KERNEL_ADDR(newpath));
+    if (*oldpath == 0 || *newpath == 0) {
+        return -1;
+    }
+
+    Proc *proc = thisproc();
+    Inode *oldino = NULL;
+    char *buf = kalloc(64);
+
+    // Step 1: oldpath -> oldino
+    do {
+        Inode *start = *oldpath == '/' ? inodes.share(inodes.root) :
+                                         inodes.share(proc->cwd);
+
+        ASSERT(start->valid);
+        while (*oldpath == '/') {
+            oldpath++;
+        }
+
+        if (*oldpath == 0) {
+            // cannot link root
+            kfree(buf);
+            inodes.put(NULL, start);
+            return -1;
+        }
+
+        Inode *ino = walk(start, oldpath, buf);
+        if (ino == NULL) {
+            kfree(buf);
+            return -1;
+        }
+        ASSERT(ino->valid);
+
+        inodes.lock(ino);
+        usize fno = inodes.lookup(ino, buf, NULL);
+        inodes.unlock(ino);
+        inodes.put(NULL, ino);
+        ino = NULL;
+
+        if (fno == 0) {
+            // the entry does not exist. abort
+            kfree(buf);
+            return -1;
+        }
+
+        oldino = inodes.get(fno);
+        ASSERT(oldino->inode_no == fno);
+
+        inodes.lock(oldino);
+        inodes.sync(NULL, oldino, false);
+        inodes.unlock(oldino);
+        ASSERT(oldino->valid);
+        ASSERT(oldino->rc.count > 0);
+
+        if (oldino->entry.type != INODE_REGULAR) {
+            // not a regular file!
+            kfree(buf);
+            inodes.put(NULL, oldino);
+            return -1;
+        }
+    } while (0);
+
+    // step 2: newpath -> corresponding dir.
+    Inode *newdir = NULL;
+    do {
+        const char *path = newpath;
+        Inode *start = *path == '/' ? inodes.share(inodes.root) :
+                                      inodes.share(proc->cwd);
+
+        while (*path == '/') {
+            path++;
+        }
+
+        if (*path == 0) {
+            // fail: cannot link at root.
+            kfree(buf);
+            inodes.put(NULL, oldino);
+            inodes.put(NULL, start);
+            return -1;
+        }
+
+        Inode *ino = walk(start, path, buf);
+        if (ino == NULL) {
+            // fail: not found.
+            kfree(buf);
+            inodes.put(NULL, oldino);
+            return -1;
+        }
+        ASSERT(ino->valid);
+        ASSERT(ino->entry.type == INODE_DIRECTORY);
+
+        newdir = ino;
+        inodes.lock(newdir);
+        usize no = inodes.lookup(newdir, buf, NULL);
+        inodes.unlock(newdir);
+
+        if (no != 0) {
+            // the entry exists, cannot link
+            kfree(buf);
+            inodes.put(NULL, oldino);
+            inodes.put(NULL, newdir);
+            return -1;
+        }
+
+    } while (0);
+
+    // step 3: do insertion, increment oldino's link count.
+    OpContext *ctx = kalloc(sizeof(OpContext));
+    bcache.begin_op(ctx);
+    inodes.lock(newdir);
+    inodes.insert(ctx, newdir, buf, oldino->inode_no);
+    newdir->entry.num_links++;
+    inodes.sync(ctx, newdir, true);
+    inodes.unlock(newdir);
+    inodes.put(ctx, newdir);
+
+    ASSERT(oldino->entry.num_links > 0);
+    inodes.lock(oldino);
+    oldino->entry.num_links++;
+    inodes.sync(ctx, oldino, true);
+    inodes.unlock(oldino);
+    inodes.put(ctx, oldino);
+    bcache.end_op(ctx);
+
+    // step 4: deallocate, return.
+    kfree(ctx);
+    kfree(buf);
+    return 0;
 }

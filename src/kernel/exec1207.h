@@ -95,6 +95,7 @@ typedef struct {
 #define PF_W (1 << 1) /* Segment is writable */
 #define PF_R (1 << 2) /* Segment is readable */
 #define PF_F (1 << 3) /* Segment has a file backend */
+#define PF_S (1 << 4) /* Segment is shared. */
 #define PF_MASKOS 0x0ff00000 /* OS-specific */
 #define PF_MASKPROC 0xf0000000 /* Processor-specific */
 

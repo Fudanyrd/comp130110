@@ -93,7 +93,7 @@ int sys_dup2(int oldfd, int newfd);
 
 /** Link/Unlink */
 
-int sys_link(const char *src, const char *target);
+int sys_link(const char *oldpath, const char *newpath);
 int sys_unlink(const char *target);
 
 #ifndef STAND_ALONE

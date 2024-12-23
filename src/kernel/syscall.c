@@ -38,6 +38,7 @@ void syscall_sbrk(UserContext *ctx);
 void syscall_mmap(UserContext *ctx);
 void syscall_munmap(UserContext *ctx);
 void syscall_socket(UserContext *ctx);
+void syscall_link(UserContext *ctx);
 
 /** Page table helper methods. */
 
@@ -63,7 +64,8 @@ void *syscall_table[NR_SYSCALL] = {
     [18] = (void *)syscall_mmap,
     [19] = (void *)syscall_munmap,
     [20] = (void *)syscall_socket,
-    [21 ... NR_SYSCALL - 1] = NULL,
+    [21] = (void *)syscall_link,
+    [22 ... NR_SYSCALL - 1] = NULL,
     [SYS_myreport] = (void *)syscall_myreport,
 };
 
@@ -720,6 +722,35 @@ void syscall_mmap(UserContext *ctx)
 void syscall_munmap(UserContext *ctx)
 {
     ctx->x0 = munmap((void *)ctx->x0, ctx->x1);
+    return;
+}
+
+void syscall_link(UserContext *ctx)
+{
+    char *oldpth = kalloc_page();
+    if (oldpth == NULL) {
+        ctx->x0 = -1;
+        return;
+    }
+    char *newpth = kalloc_page();
+    if (newpth == NULL) {
+        kfree_page(oldpth);
+        ctx->x0 = -1;
+        return;
+    }
+
+    struct pgdir *pd = &thisproc()->pgdir;
+    if (copyinstr(pd, oldpth, ctx->x0) != 0 ||
+        copyinstr(pd, newpth, ctx->x1) != 0) {
+        kfree_page(oldpth);
+        kfree_page(newpth);
+        ctx->x0 = -1;
+        return;
+    }
+
+    ctx->x0 = sys_link(oldpth, newpth);
+    kfree_page(oldpth);
+    kfree_page(newpth);
     return;
 }
 

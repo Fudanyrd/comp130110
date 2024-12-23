@@ -11,7 +11,6 @@ static char buf[4];
 
 int main(int argc, char **argv)
 {
-    int i = 0;
     buf[1] = 0;
 
     if (sys_fork() == 0) {
