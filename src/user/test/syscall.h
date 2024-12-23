@@ -203,6 +203,7 @@ typedef struct {
 
 // flags
 
+#define MAP_SHARED 0
 #define MAP_PRIVATE 1
 #define MAP_FIXED 2
 
