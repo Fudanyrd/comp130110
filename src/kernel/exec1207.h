@@ -113,4 +113,7 @@ typedef struct {
 extern int exec(const char *path, char **argv);
 extern int fork();
 
+// Make stack size: 8 pages.
+#define STACK_PAGE 8
+
 #endif // _KERNEL_EXEC_
