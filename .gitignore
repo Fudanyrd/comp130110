@@ -61,6 +61,7 @@ dkms.conf
 .mypy_cache/
 mkfs/
 *.tar
+.gdbinit
 
 # CMake output
 compile_flags.txt

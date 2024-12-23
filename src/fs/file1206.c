@@ -1267,6 +1267,7 @@ int sys_link(const char *oldpath, const char *newpath)
 
     // step 3: do insertion, increment oldino's link count.
     OpContext *ctx = kalloc(sizeof(OpContext));
+    bcache.begin_op(ctx);
     inodes.lock(newdir);
     inodes.insert(ctx, newdir, buf, oldino->inode_no);
     newdir->entry.num_links++;
@@ -1280,6 +1281,7 @@ int sys_link(const char *oldpath, const char *newpath)
     inodes.sync(ctx, oldino, true);
     inodes.unlock(oldino);
     inodes.put(ctx, oldino);
+    bcache.end_op(ctx);
 
     // step 4: deallocate, return.
     kfree(ctx);
