@@ -6,7 +6,7 @@
 
 // consider change it to 16 to support more
 // file ops
-#define NQUEUE 8
+#define NQUEUE 16
 
 #define VIRTIO_REG_MAGICVALUE (VIRTIO0 + 0x00)
 #define VIRTIO_REG_VERSION (VIRTIO0 + 0x04)

@@ -83,9 +83,17 @@ extern int exec(const char *path, char **argv)
     sec->flags = 0;
     sec->flags |= PF_R; // readable
     sec->flags |= PF_W; // writable
-    sec->npages = 1;
-    sec->start = (u64)(STACK_START - PAGE_SIZE);
+    sec->npages = STACK_PAGE;
+    sec->start = (u64)(STACK_START - PAGE_SIZE * STACK_PAGE);
     pgdir_add_section(pd, sec);
+    for (int i = 0; i < STACK_PAGE - 1; i++) {
+        u64 uva = sec->start + i * PAGE_SIZE;
+        PTEntry *pte = get_pte(pd, uva, true);
+        ASSERT(pte != NULL);
+        *pte = K2P(kalloc_zero());
+        *pte = *pte | PTE_USER_DATA;
+        *pte = *pte | PTE_RO;
+    }
     sec = NULL; // avoid modification
 
     // setup a user context for trap_return.
