@@ -183,29 +183,15 @@ static void bitmap_set(uint64_t *buf, usize idx)
 
 static void add_file()
 {
-    static char buf[512];
+    static char buf[16];
 
-    char *m = malloc(sizeof(buf));
+    char *m = malloc(BLOCK_SIZE);
 
-    char *dst;
-    char *src;
+    char dst[64];
+    char src[64];
 
-    while (fgets(buf, sizeof(buf), stdin)) {
-        // split input
-        dst = (char *)buf + 2;
-        src = dst;
-        while (*src != ' ') {
-            src++;
-        }
-        *src = 0;
-        src++;
-
-        // null terminate
-        char *pt = src;
-        while (*pt != '\n') {
-            pt++;
-        }
-        *pt = 0;
+    while (scanf("%s %s %s", buf, dst, src) == 3) {
+        printf("cmd=%s dst=%s src=%s ret=", buf, dst, src);
 
         switch (buf[0]) {
         case 'm': {
@@ -243,6 +229,7 @@ static void add_file()
             break;
         }
         default: {
+            printf("0(exit)\n");
             free(m);
             return;
         }
