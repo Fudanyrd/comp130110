@@ -200,30 +200,15 @@ static void check_file_or_dir(const char *fname)
 
 static void shell(void)
 {
-    static char buf[512];
+    static char buf[16];
 
-    char *m = malloc(sizeof(buf));
+    char *m = malloc(BLOCK_SIZE);
 
-    char *dst;
-    char *src;
+    static char dst[64];
+    static char src[64];
 
     write(1, "< ", 2);
-    while (fgets(buf, sizeof(buf), stdin)) {
-        // split input
-        dst = (char *)buf + 2;
-        src = dst;
-        while (*src != ' ') {
-            src++;
-        }
-        *src = 0;
-        src++;
-
-        // null terminate
-        char *pt = src;
-        while (*pt != '\n') {
-            pt++;
-        }
-        *pt = 0;
+    while (scanf("%s %s %s", buf, dst, src) == 3) {
 
         switch (buf[0]) {
         case 'm': {
