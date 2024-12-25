@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(rpi-os VERSION 0.1.0 LANGUAGES C ASM)
+project(rpi-os VERSION 0.1.0 LANGUAGES C ASM CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS True)
 
@@ -20,7 +20,8 @@ set(aarch64_objcopy "${aarch64_prefix}objcopy")
 set(aarch64_qemu "qemu-system-aarch64")
 
 add_subdirectory(src)
-add_subdirectory(boot)
+add_subdirectory(tools)
+add_subdirectory(users)
 
 get_property(kernel_elf GLOBAL PROPERTY kernel_elf_path)
 get_property(kernel_image GLOBAL PROPERTY kernel_image_path)
@@ -82,32 +83,12 @@ add_custom_target(debug
 
 # script for running qemu.
 add_custom_target(script
-    COMMAND echo \"\#!/usr/bin/bash\" > debug.sh &&
-            echo \"\#Auto Generated. Don\'t Modify.\" >> debug.sh &&
+    COMMAND /usr/bin/echo \"\#!/usr/bin/bash\" > debug.sh &&
+            /usr/bin/echo \"\#Auto Generated. Don\'t Modify.\" >> debug.sh &&
             make -n qemu | grep \"qemu-system-aarch64\" | sed -r \"s/ -/ \\\\\\\\\\n\\t-/g\" >> debug.sh &&
             chmod +x debug.sh
 )
 
-# if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-# 	add_custom_target(init_libc
-# 	COMMAND git submodule update --init && cd ../libc &&
-# 			./configure)
-# else()
-# 	add_custom_target(init_libc
-# 		COMMAND git submodule update --init && cd ../libc &&
-# 				export CROSS_COMPILE=${aarch64_prefix} &&
-# 				./configure --target=aarch64)
-# endif()
-
-# set(LIBC_SPEC ${CMAKE_CURRENT_SOURCE_DIR}/libc/lib/musl-gcc.specs)
-# set(LIBC_SPEC_OUT musl-gcc.specs)
-# add_custom_target(libc
-# 	COMMAND make -C ../libc -j12 &&
-# 	sed -e \"s/\\/usr\\/local\\/musl/..\\/..\\/..\\/libc/g\" ${LIBC_SPEC} > ${LIBC_SPEC_OUT})
-
-# @Fudanyrd
-# if you want to run your foo test, run: `make foo-test` in build dir.
-# if you want to debug your foo test, run: `make foo-test-gdb`.
 foreach(tcase IN LISTS tcases)
     get_property(elf GLOBAL PROPERTY ${tcase}_elf_path)
     message(STATUS "Adding custom target for ${tcase}")

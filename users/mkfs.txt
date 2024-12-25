@@ -1,0 +1,11 @@
+m /bin 0
+m /home 0
+w /bin/sh xsh
+w /bin/echo echo
+w /bin/ls ls
+w /bin/stat stat
+w /bin/relf relf
+w /bin/mmaptest mmaptest
+w /bin/fstest23 fstest23
+w /init init
+q q q
