@@ -25,6 +25,8 @@ static int strcmp(const char *a, const char *b)
     return (int)a[i] - (int)b[i];
 }
 
+static void deletefile(const char *name);
+
 static void printint(int fd, int xx, int base, int sgn)
 {
     char buf[16];
@@ -58,6 +60,11 @@ int main(int argc, char **argv)
     mmaptest();
     forktest();
     sys_print("All tests passed.", 18);
+    sys_print("cleaning...", 12);
+
+    // remove the tmp file
+    const char *fn = "mmap.dur";
+    deletefile(fn);
     sys_exit(0);
 }
 
@@ -192,8 +199,8 @@ static void mmaptest()
     }
     close(fd1);
     close(fd2);
-    sys_unlink("mmap1");
-    sys_unlink("mmap2");
+    deletefile("mmap1");
+    deletefile("mmap2");
     munmap(p1, PAGE_SIZE);
     munmap(p2, PAGE_SIZE);
     write(1, "Map 2 PASS\n", 12);
@@ -236,4 +243,17 @@ static void forktest()
     _v1(p1);
     _v1(p2);
     write(1, "Fork PASS\n", 11);
+}
+
+// If a file exists, unlink it.
+static void deletefile(const char *name)
+{
+    int fd = open(name, O_READ);
+    if (fd >= 0) {
+        close(fd);
+        if (sys_unlink(name) != 0) {
+            sys_write(2, "cannnot unlink, abort\n", 23);
+            exit(1);
+        }
+    }
 }
