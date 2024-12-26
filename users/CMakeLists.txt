@@ -8,7 +8,7 @@ set(compiler_warnings "-Wall -Werror")
 set(compiler_flags "${compiler_warnings} \
     -static -ffreestanding -nostdlib -O3 -fno-plt -fno-pic -mgeneral-regs-only -Wall -Werror")
 
-set(CMAKE_EXE_LINKER_FLAGS "-nostdlib")
+set(CMAKE_EXE_LINKER_FLAGS "-nostdlib -Xlinker --strip-all")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${compiler_flags}")
 
 add_custom_target(ping
