@@ -40,3 +40,11 @@ target_link_libraries(inode_test fs-local mock)
 
 add_executable(cache_test cache_test.cpp)
 target_link_libraries(cache_test fs-local mock)
+
+# run tests.
+add_custom_target(fstest
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/cache_test && 
+            ${CMAKE_CURRENT_BINARY_DIR}/inode_test &&
+            ${CMAKE_CURRENT_BINARY_DIR}/pipe_test
+    DEPENDS cache_test inode_test pipe_test
+)

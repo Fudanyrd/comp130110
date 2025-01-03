@@ -1,0 +1,15 @@
+m /bin 0
+m /home 0
+w /bin/sh xsh
+w /bin/echo echo
+w /bin/ls ls
+w /bin/pwd pwd
+w /bin/write write
+w /bin/fstest23 fstest23
+w /bin/mkdir mkdir
+w /bin/link link
+w /bin/unlink unlink
+w /bin/stat stat
+w /bin/cat cat
+w /init init
+q q q
