@@ -31,3 +31,6 @@ target_link_libraries(copyin fs-local mock )
 
 add_executable(copyout copyout.c)
 target_link_libraries(copyout fs-local mock )
+
+add_executable(pipe_test pipe_test.cpp)
+target_link_libraries(pipe_test fs-local mock)

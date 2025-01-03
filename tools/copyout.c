@@ -209,7 +209,6 @@ static void shell(void)
 
     write(1, "< ", 2);
     while (scanf("%s %s %s", buf, dst, src) == 3) {
-
         switch (buf[0]) {
         case 'm': {
             // mkdir
