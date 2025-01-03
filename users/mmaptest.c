@@ -1,6 +1,11 @@
 // mmap test from previous year.
 
 #include "syscall.h"
+#ifdef MMAP_MIN_ADDR
+#undef MMAP_MIN_ADDR
+#endif
+
+#define MMAP_MIN_ADDR ((void *)0x60000000)
 #define PAGE_SIZE 4096
 #define open sys_open
 #define exit sys_exit
@@ -54,11 +59,13 @@ static void printint(int fd, int xx, int base, int sgn)
 
 static void mmaptest();
 static void forktest();
+static void collidetest();
 
 int main(int argc, char **argv)
 {
     mmaptest();
     forktest();
+    collidetest();
     sys_print("All tests passed.", 18);
     sys_print("cleaning...", 12);
 
@@ -242,6 +249,8 @@ static void forktest()
     sys_wait(&id);
     _v1(p1);
     _v1(p2);
+    munmap(p1, PAGE_SIZE * 2);
+    munmap(p2, PAGE_SIZE * 2);
     write(1, "Fork PASS\n", 11);
 }
 
@@ -256,4 +265,86 @@ static void deletefile(const char *name)
             exit(1);
         }
     }
+}
+
+// [New] check MAP_FIXED and collision detect
+static void collidetest()
+{
+    write(1, "Test collison\n", 15);
+
+    // get a initial address
+    void *start = sys_mmap((void *)MMAP_MIN_ADDR, PAGE_SIZE,
+                           PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE, -1,
+                           0);
+
+    if (start != MMAP_MIN_ADDR) {
+        write(2, "start: mmap failed\n", 20);
+        exit(1);
+    }
+
+    // mmap another 2, which should succeed.
+    void *p1 = sys_mmap(start + PAGE_SIZE, PAGE_SIZE * 2, PROT_READ,
+                        MAP_FIXED | MAP_PRIVATE, -1, 0);
+    void *p2 = sys_mmap(start + PAGE_SIZE * 3, PAGE_SIZE * 3, PROT_READ,
+                        MAP_FIXED | MAP_PRIVATE, -1, 0);
+
+    // clang-format off
+    // current mapping:
+    // [ ]     [ ]  [ ] [ ] [ ] [ ]
+    // ^start  ^ p1     ^p2
+    // clang-format on
+
+    if (p1 != start + PAGE_SIZE) {
+        write(2, "p1: mmap failed\n", 17);
+        exit(1);
+    }
+    if (p2 != start + PAGE_SIZE * 3) {
+        write(2, "p2: mmap failed\n", 17);
+        exit(1);
+    }
+
+    // try mapping in the area
+    void *pt =
+            mmap(start + PAGE_SIZE, PAGE_SIZE * 4, PROT_READ, MAP_FIXED, -1, 0);
+    if (pt != MMAP_FAILED) {
+        write(2, "pt: mmap should fail\n", 22);
+        exit(1);
+    }
+
+    // munamp p1. current scenario:
+    munmap(p1, PAGE_SIZE * 2);
+    // clang-format off
+    // current mapping:
+    // [ ]     [I]  [I] [ ] [ ] [ ]
+    // ^start           ^p2
+    // clang-format on
+
+    // collide start.
+    pt = mmap(start + PAGE_SIZE * 3, PAGE_SIZE, PROT_READ, MAP_FIXED, -1, 0);
+    if (pt != MMAP_FAILED) {
+        write(2, "pt: mmap should fail\n", 22);
+        exit(1);
+    }
+
+    // collide end.
+    pt = mmap(start + PAGE_SIZE * 2, PAGE_SIZE * 2, PROT_READ, MAP_FIXED, -1,
+              0);
+    if (pt != MMAP_FAILED) {
+        write(2, "pt: mmap should fail\n", 22);
+        exit(1);
+    }
+
+    // remap p1.
+    p1 = mmap(start + PAGE_SIZE, PAGE_SIZE * 2, PROT_READ, MAP_FIXED, -1, 0);
+    if (p1 != start + PAGE_SIZE) {
+        write(2, "remap p1 failed\n", 17);
+        exit(1);
+    }
+
+    // done. clean up.
+    munmap(start, PAGE_SIZE);
+    munmap(p1, PAGE_SIZE * 2);
+    munmap(p2, PAGE_SIZE * 3);
+
+    write(1, "collison PASS\n", 15);
 }
