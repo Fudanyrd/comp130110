@@ -20,12 +20,45 @@ u64 mmap(void *addr, u64 length, int prot, int flags, int fd, isize offset)
         return MMAP_FAILED;
     }
 
+    // if the length is 0, return FAIL
+    if (length == 0) {
+        return MMAP_FAILED;
+    }
+
     Proc *proc = thisproc();
     File **ofile = (File **)proc->ofile.ofile;
     struct pgdir *pd = &proc->pgdir;
 
     if (flags & MAP_FIXED) {
         // nothing to be done.
+        struct list *seclst = &pd->sections;
+        ASSERT(!list_empty(seclst));
+
+        struct section *sec;
+        struct list_elem *elem = list_begin(seclst);
+
+        // start of user designated mapping
+        const u64 start = (u64)addr;
+        // end of user designated mapping.
+        const u64 end = start + length;
+
+        // check whether [addr, addr + length] collide
+        // with an existing section.
+        for (; elem != list_end(seclst); elem = list_next(elem)) {
+            sec = list_entry(elem, struct section, node);
+            ASSERT((sec->start & 0xfff) == 0);
+            const u64 sec_end = sec->start + sec->npages * PAGE_SIZE;
+
+            // check collision: addr(start)
+            if (start >= sec->start && start < sec_end) {
+                return MMAP_FAILED;
+            }
+
+            // check collision: (addr + length)(end)
+            if (end > sec->start && end <= sec_end) {
+                return MMAP_FAILED;
+            }
+        }
     } else {
         addr = find_mmap_addr(pd, length);
     }
