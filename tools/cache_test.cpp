@@ -1,5 +1,7 @@
 extern "C" {
 #include <fs/cache.h>
+
+extern BlockCache bcache;
 }
 
 #include "assert.hpp"
@@ -12,6 +14,7 @@ extern "C" {
 #include <condition_variable>
 #include <random>
 #include <thread>
+
 
 namespace
 {
@@ -376,7 +379,7 @@ void test_replay()
         }
     }
 
-    init_bcache(&sblock, &device);
+    init_bcache(&sblock, &bdev);
 
     assert_eq(header->num_blocks, 0);
     for (usize i = 0; i < 5; i++) {
@@ -674,7 +677,7 @@ void test_simple_crash()
         assert_eq(b[202], 0x08);
         assert_eq(b[203], 0x17);
 
-        init_bcache(&sblock, &device);
+        init_bcache(&sblock, &bdev);
         assert_eq(b[200], 0x19);
         assert_eq(b[201], 0x26);
         assert_eq(b[202], 0x08);
@@ -701,7 +704,7 @@ void test_parallel(usize num_rounds, usize num_workers, usize delay_ms,
                 std::fill(b, b + BLOCK_SIZE, 0);
             }
 
-            init_bcache(&sblock, &device);
+            init_bcache(&sblock, &bdev);
 
             std::atomic<bool> started = false;
             for (usize i = 0; i < num_workers; i++) {
@@ -753,7 +756,7 @@ void test_parallel(usize num_rounds, usize num_workers, usize delay_ms,
                 replay_count++;
 
             if ((child = fork()) == IN_CHILD) {
-                init_bcache(&sblock, &device);
+                init_bcache(&sblock, &bdev);
                 assert_eq(header->num_blocks, 0);
 
                 for (usize i = 0; i < num_workers; i++) {
@@ -890,7 +893,7 @@ void test_banker()
                 replay_count++;
 
             if ((child = fork()) == IN_CHILD) {
-                init_bcache(&sblock, &device);
+                init_bcache(&sblock, &bdev);
 
                 i64 sum = 0;
                 usize t = sblock.num_blocks - num_accounts;

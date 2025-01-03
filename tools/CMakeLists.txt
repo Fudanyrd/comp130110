@@ -11,7 +11,7 @@ include_directories(../src)
 
 set(compiler_warnings "-Wall -Wextra")
 set(compiler_flags "${compiler_warnings} \
-    -O0 -ftree-pre -g -DSTAND_ALONE \
+    -O2 -ftree-pre -g -DSTAND_ALONE \
     -fno-omit-frame-pointer \
     -fsanitize=undefined \
     -fno-sanitize=alignment")
@@ -34,3 +34,9 @@ target_link_libraries(copyout fs-local mock )
 
 add_executable(pipe_test pipe_test.cpp)
 target_link_libraries(pipe_test fs-local mock)
+
+add_executable(inode_test inode_test.cpp)
+target_link_libraries(inode_test fs-local mock)
+
+add_executable(cache_test cache_test.cpp)
+target_link_libraries(cache_test fs-local mock)

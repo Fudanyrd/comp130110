@@ -4,7 +4,7 @@
 
 static MockBlockDevice mock;
 static SuperBlock sblock;
-static BlockDevice device;
+static BlockDevice bdev;
 
 static void stub_read(usize block_no, u8 *buffer) {
     mock.read(block_no, buffer);
@@ -29,8 +29,8 @@ static void initialize_mock(  //
 
     mock.initialize(sblock);
 
-    device.read = stub_read;
-    device.write = stub_write;
+    bdev.read = stub_read;
+    bdev.write = stub_write;
 
     if (!image_path.empty())
         mock.load(image_path);
@@ -41,5 +41,5 @@ static void initialize_mock(  //
     usize num_data_blocks,
     const std::string &image_path = "") {
     initialize_mock(log_size, num_data_blocks, image_path);
-    init_bcache(&sblock, &device);
+    init_bcache(&sblock, &bdev);
 }

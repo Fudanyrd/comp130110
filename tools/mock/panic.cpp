@@ -16,7 +16,7 @@ void _panic(const char *file, int line)
     printf("(fatal) ");
     puts("");
     std::stringstream buf;
-    buf << file << ":L" << line << ": kernel panic";
+    buf << file << ":" << line << ": kernel panic";
     throw Panic(buf.str());
 }
 }
