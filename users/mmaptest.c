@@ -84,12 +84,14 @@ void _v1(char *p)
                 sys_write(2, "mismatch at ", 13);
                 printint(2, i, 10, 0);
                 sys_write(2, "\n", 2);
+                exit(1);
             }
         } else {
             if (p[i] != 0) {
                 sys_write(2, "mismatch at ", 13);
                 printint(2, i, 10, 0);
                 sys_write(2, "\n", 2);
+                exit(1);
             }
         }
     }
@@ -116,6 +118,7 @@ void makefile(const char *name)
 
 static void mmaptest()
 {
+    write(1, "mmap_test starting\n", 20);
     const char *f = "mmap.dur";
     makefile(f);
 
@@ -128,31 +131,50 @@ static void mmaptest()
         sys_write(1, "mmap test open\n", 16);
         exit(1);
     }
+    write(1, "test mmap f\n", 13);
+
     p = mmap(NULL, PAGE_SIZE * 2, PROT_READ, MAP_PRIVATE, fd, 0);
     _v1(p);
     if (munmap(p, PAGE_SIZE * 2) != 0) {
         write(2, "mmaptest: unmap\n", 17);
         exit(1);
     }
-    write(1, "Open PASS\n", 10);
+    write(1, "test mmap f: OK\n", 17);
 
-    write(1, "Test Invalid\n", 14);
+    write(1, "test mmap private\n", 19);
+    p = mmap(0, PAGE_SIZE * 2, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    if (p == MMAP_FAILED) {
+        exit(1);
+    }
+    if (close(fd) == -1) {
+        exit(1);
+    }
+    _v1(p);
+    for (int i = 0; i < PAGE_SIZE * 2; i++)
+        p[i] = 'Z';
+    if (munmap(p, PAGE_SIZE * 2) == -1) {
+        exit(1);
+    }
+    write(1, "test mmap private: OK\n", 24);
+
+    write(1, "test mmap read-only\n", 21);
+    fd = open(f, O_READ);
     p = mmap(NULL, PAGE_SIZE * 3, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p != MMAP_FAILED) {
         write(2, "mmaptest: should fail\n", 23);
         exit(1);
     }
     sys_close(fd);
-    write(1, "Invalid PASS\n", 14);
+    write(1, "test mmap read-only: OK\n", 25);
 
     // test map dirty.
-    write(1, "Test Dirty\n", 12);
+    write(1, "test mmap read/write\n", 22);
     fd = open(f, O_READ | O_WRITE);
     if (fd < 0) {
         write(2, "mmaptest: open\n", 16);
     }
 
-    p = mmap(NULL, PAGE_SIZE * 2, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    p = mmap(NULL, PAGE_SIZE * 3, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     for (int i = 0; i < PAGE_SIZE * 2; i++) {
         p[i] = 'Z';
     }
@@ -160,9 +182,13 @@ static void mmaptest()
         write(2, "mmaptest: unmap\n", 17);
         exit(1);
     }
-    close(fd);
-    write(1, "Dirty unmap\n", 13);
+    if (close(fd) != 0) {
+        write(2, "close\n", 6);
+        exit(1);
+    }
+    write(1, "test mmap read/write: OK\n", 26);
 
+    write(1, "test mmap dirty\n", 17);
     // check that the file is changed.
     fd = open(f, O_READ | O_WRITE);
     for (int i = 0; i < sizeof(buf); i++) {
@@ -177,10 +203,20 @@ static void mmaptest()
         }
     }
     close(fd);
-    write(1, "Dirty PASS\n", 12);
+    write(1, "test mmap dirty: OK\n", 21);
+
+    write(1, "test not-mapped unmap\n", 23);
+
+    // unmap the rest of the mapped memory.
+    if (munmap(p + PAGE_SIZE * 2, PAGE_SIZE) == -1) {
+        write(2, "munmap (4)\n", 12);
+        exit(1);
+    }
+
+    write(1, "test not-mapped unmap: OK\n", 27);
 
     // test two mmap
-    write(1, "Test map 2\n", 12);
+    write(1, "test mmap 2 files\n", 19);
     int fd1 = open("mmap1", O_CREATE | O_READ | O_WRITE);
     if (write(fd1, "12345", 5) != 5) {
         write(2, "mmaptest: write fd1\n", 21);
@@ -210,7 +246,8 @@ static void mmaptest()
     deletefile("mmap2");
     munmap(p1, PAGE_SIZE);
     munmap(p2, PAGE_SIZE);
-    write(1, "Map 2 PASS\n", 12);
+    write(1, "test mmap 2 files: OK\n", 23);
+    write(1, "mmap test ALL OK\n", 18);
 }
 
 static void forktest()
@@ -218,7 +255,7 @@ static void forktest()
     const char *f = "mmap.dur";
     makefile(f);
 
-    write(1, "Test fork\n", 11);
+    write(1, "fork test starting\n", 20);
     int fd = open(f, O_RDONLY);
     char *p1 = mmap(NULL, PAGE_SIZE * 2, PROT_READ, MAP_SHARED, fd, 0);
     if (p1 == MMAP_FAILED) {
@@ -242,7 +279,7 @@ static void forktest()
             write(2, "child unmap fail\n", 18);
             exit(1);
         }
-        write(1, "Child OK\n", 10);
+        write(1, "fork test child OK\n", 20);
         exit(0);
     }
 
@@ -251,7 +288,7 @@ static void forktest()
     _v1(p2);
     munmap(p1, PAGE_SIZE * 2);
     munmap(p2, PAGE_SIZE * 2);
-    write(1, "Fork PASS\n", 11);
+    write(1, "fork test parent OK\n", 21);
 }
 
 // If a file exists, unlink it.
@@ -270,7 +307,7 @@ static void deletefile(const char *name)
 // [New] check MAP_FIXED and collision detect
 static void collidetest()
 {
-    write(1, "Test collison\n", 15);
+    write(1, "test collison start\n", 21);
 
     // get a initial address
     void *start = sys_mmap((void *)MMAP_MIN_ADDR, PAGE_SIZE,
@@ -346,5 +383,5 @@ static void collidetest()
     munmap(p1, PAGE_SIZE * 2);
     munmap(p2, PAGE_SIZE * 3);
 
-    write(1, "collison PASS\n", 15);
+    write(1, "test collison ALL OK\n", 22);
 }
