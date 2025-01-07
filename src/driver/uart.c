@@ -45,11 +45,31 @@ isize uart_read(u8 *dst, usize count)
             continue;
         }
 
+        // <Ctrl-U>
+        if (*d == 'U' - '@') {
+            // clear the line.
+            for (usize k = 0; k < i; k++) {
+                uart_put_char('\b');
+            }
+            for (usize k = 0; k < i; k++) {
+                uart_put_char(' ');
+            }
+            for (usize k = 0; k < i; k++) {
+                uart_put_char('\b');
+            }
+
+            // set read bytes to 0.
+            i = 0;
+            d = (char *)dst;
+            continue;
+        }
+
         // EOF
         if (*d == (char)4) {
             return 0;
         }
 
+        // backspace
         if (*d == (char)127) {
             // backspace
             uart_put_char('\b');
