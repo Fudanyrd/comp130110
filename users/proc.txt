@@ -7,6 +7,7 @@ w /bin/pwd pwd
 w /bin/pipe pipe
 w /bin/cat cat
 w /bin/fork fork
+w /bin/forkmany forkmany
 w /bin/wait wait
 w /bin/count count
 w /bin/wc wc

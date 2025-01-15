@@ -23,7 +23,7 @@ add_library(start STATIC start.S)
 add_custom_target(mkfs-script
     COMMAND /usr/bin/ls ${CMAKE_CURRENT_SOURCE_DIR}/mkfs.txt
     DEPENDS  cat chdir count crash 
-            crash1 crash2 danger0 danger1 danger2 echo exec fork fstest23 
+            crash1 crash2 danger0 danger1 danger2 echo exec fork forkmany fstest23 
             head hear init link ls main mkdir mmaptest pipe pwd relf sh stat 
             unlink wait wc write xsh
 )
@@ -91,6 +91,10 @@ target_link_libraries(exec start)
 # user program fork
 add_executable(fork fork.c)
 target_link_libraries(fork start)
+
+# user program forkmany
+add_executable(forkmany forkmany.c)
+target_link_libraries(forkmany start)
 
 # user program fstest23
 add_executable(fstest23 fstest23.c)
