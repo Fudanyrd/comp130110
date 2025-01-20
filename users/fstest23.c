@@ -16,15 +16,15 @@ static void createtest(void);
 int main(int argc, char **argv)
 {
     // do open test
-    sys_print("open TEST", 9);
+    sys_print("open test", 9);
     opentest();
 
     // writetest
-    sys_print("write TEST", 10);
+    sys_print("write test", 10);
     writetest();
 
     // writebig test
-    sys_print("wrt large TEST", 14);
+    sys_print("write large test", 16);
     writetestbig();
 
     // create test
@@ -48,7 +48,7 @@ static void opentest(void)
         sys_print("open should FAIL", 16);
         return;
     }
-    sys_print("open PASS", 9);
+    sys_print("open test OK", 13);
 }
 
 static void writetest(void)
@@ -73,7 +73,7 @@ static void writetest(void)
     }
 
     sys_close(fd);
-    sys_print("write PASS", 10);
+    sys_print("write test OK", 14);
 
     // read test
     fd = sys_open("small", O_READ);
@@ -131,7 +131,7 @@ static void writetestbig(void)
     if (sys_unlink("large") < 0) {
         sys_print("unlink FAIL", 10);
     } else {
-        sys_print("wrt large PASS", 14);
+        sys_print("write test big OK", 18);
     }
 }
 
@@ -159,5 +159,5 @@ static void createtest(void)
         }
     }
 
-    sys_print("create PASS", 11);
+    sys_print("create test OK", 15);
 }

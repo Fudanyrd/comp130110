@@ -88,6 +88,7 @@ void syscall_entry(UserContext *context)
         // function that executes the syscall
         syscall_fn fn = syscall_table[id];
         fn(context);
+        arch_tlbi_vmalle1is();
         // printk("[KERNEL] pid %d syscall id %lld return %lld\n",
         // thisproc()->pid, id, context->x0);
         break;

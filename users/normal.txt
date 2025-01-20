@@ -1,0 +1,16 @@
+m /bin 0
+m /home 0
+w /bin/sh xsh
+w /bin/echo echo
+w /bin/ls ls
+w /bin/pwd pwd
+w /bin/relf relf
+w /bin/hear hear
+w /bin/cat cat
+w /bin/wc wc
+w /bin/stat stat
+w /bin/mkdir mkdir
+w /bin/link link
+w /bin/unlink unlink
+w /init init
+q q q

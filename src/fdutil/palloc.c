@@ -12,11 +12,11 @@ struct page {
     char fre[0];
 };
 
-// use u8 to do ref count,
-// support at most 255 forks, which is large enough
+// use this unsigned type as ref count.
+// If too wide, will waste some pages.
 typedef u8 refcnt_t;
 
-#define MAX_REF_CNT ((u8)0xff)
+#define MAX_REF_CNT ((refcnt_t) - 1)
 
 /** Page allocator(O(1) for all operations) */
 struct pallocator {
@@ -49,7 +49,8 @@ static INLINE refcnt_t *pg2refcnt(void *pg)
 {
     ASSERT(pg_off(pg) == 0);
     ASSERT(pg >= allocator.start && pg < allocator.end);
-    return allocator.refcnts + (pg - allocator.start) / PAGE_SIZE;
+    const usize idx = (pg - allocator.start) / PAGE_SIZE;
+    return &allocator.refcnts[idx];
 }
 
 /** Initialize the page allocator, Will hold lock */
@@ -67,6 +68,9 @@ void palloc_init(void)
     extern char end[];
     ASSERT(end != NULL);
 
+    // make sure that refcnt_t is unsigned.
+    STATIC_ASSERT(MAX_REF_CNT > ((refcnt_t)0));
+
     // first page
     void *first = pg_round_up((void *)end);
     // last page(exclusive)
@@ -78,13 +82,13 @@ void palloc_init(void)
 
     // leave pages for refcnt.
     // nrf = round_up(npgs, 4096)
-    const size_t nrf = (npgs + PAGE_SIZE - 1) / PAGE_SIZE;
+    const size_t nrf = (npgs * sizeof(refcnt_t) + PAGE_SIZE - 1) / PAGE_SIZE;
     ASSERT(nrf < npgs);
     // init refcount area.
     memset(first, 0, PAGE_SIZE * nrf);
 
     // update first.
-    allocator.refcnts = (u8 *)first;
+    allocator.refcnts = (refcnt_t *)first;
     first += nrf * PAGE_SIZE;
 
     // init pallocator.
@@ -110,8 +114,8 @@ void *palloc_share(void *pg)
     // fast path: the page count does not overflow.
     acquire_spinlock(&allocator.lock);
     refcnt_t *rc = pg2refcnt(pg);
-    ASSERT(*rc > (u8)0);
-    if (*rc != (u8)0xff) {
+    ASSERT(*rc > (refcnt_t)0);
+    if (*rc != MAX_REF_CNT) {
         *rc = *rc + 1;
         // just give the page back.
         release_spinlock(&allocator.lock);
@@ -180,7 +184,7 @@ static void *pallocator_get(struct pallocator *pa)
 
     // update ref count
     refcnt_t *rc = pg2refcnt(ret);
-    ASSERT(*rc == (u8)0);
+    ASSERT(*rc == (refcnt_t)0);
     *rc = *rc + 1;
 
     // return
@@ -206,7 +210,7 @@ static void pallocator_free(struct pallocator *pa, void *pg)
     // deal with refcount
     acquire_spinlock(&pa->lock);
     refcnt_t *rc = pg2refcnt(pg);
-    ASSERT(*rc > (u8)0x0);
+    ASSERT(*rc > (refcnt_t)0x0);
     *rc = *rc - 1;
     if (*rc > 0) {
         // it is used by someone else, do NOT free

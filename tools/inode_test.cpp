@@ -164,6 +164,11 @@ void test_share()
     auto *q = inodes.share(p);
     auto *r = inodes.get(ino);
 
+    inodes.lock(p);
+    inodes.sync(NULL, p, false);
+    assert_true(p->valid);
+    inodes.unlock(p);
+
     assert_eq(r->rc.count, 3);
 
     mock.begin_op(ctx);
@@ -417,6 +422,7 @@ int main()
     else
         return -1;
 
+    adhoc::test_share();
     std::vector<Testcase> tests = {
         { "alloc", adhoc::test_alloc },
         { "sync", adhoc::test_sync },

@@ -1,6 +1,0 @@
-m /init/ 0
-m /usr/ 0
-m /home/ 0
-a /home/README 0
-w /home/README mkfs.c
-w /home/fs.txt fs.txt

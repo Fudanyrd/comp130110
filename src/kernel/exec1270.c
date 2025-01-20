@@ -37,6 +37,26 @@ extern int exec(const char *path, char **argv)
     }
     fread(exe, (char *)ehdr, sizeof(*ehdr));
 
+    // Check the executable header, the first 4 bytes.
+    // FIXME: big endian or little endian?
+    do {
+        // step 1: magic number
+        const char *magic = (const char *)ehdr->e_ident;
+        if (magic[0] != 0x7f || magic[1] != 'E' || magic[2] != 'L' ||
+            magic[3] != 'F') {
+            // Invalid ELF
+            kfree(ehdr);
+            goto exec_bad;
+        }
+
+        // step 2: machine type
+        if (ehdr->e_machine != EM_AARCH64) {
+            // unsupported machine.
+            kfree(ehdr);
+            goto exec_bad;
+        }
+    } while (0);
+
     Elf64_Phdr *phdr = kalloc(sizeof(Elf64_Phdr));
     if (phdr == NULL) {
         // must fail

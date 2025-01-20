@@ -387,6 +387,8 @@ File *fopen(const char *path, int flags)
             inodes.clear(ctx, fino);
             inodes.unlock(fino);
             bcache.end_op(ctx);
+            // free the context
+            kfree(ctx);
         }
         inodes.put(NULL, ino);
     }
@@ -611,7 +613,9 @@ static isize fino_write(File *fobj, char *addr, isize n)
     return ret;
 
 fiw_bad:
-    bcache.end_op(ctx);
+    // Should not do this. Since file_write_safe handles
+    // it.
+    // bcache.end_op(ctx);
     kfree(ctx);
     return -1;
 }

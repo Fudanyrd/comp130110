@@ -1,0 +1,15 @@
+m /bin 0
+m /home 0
+w /bin/sh xsh
+w /bin/ls ls
+w /bin/relf relf
+w /bin/crash crash
+w /bin/crash1 crash1
+w /bin/crash2 crash2
+w /bin/danger0 danger0
+w /bin/danger1 danger1
+w /bin/danger2 danger2
+w /bin/echo echo
+w /bin/mmaptest mmaptest
+w /init init
+q q q

@@ -10,7 +10,7 @@
 /** My program's address space layout
  * +----------+ <- 0xc0000000
  * |  stack   |
- * +----------+ <- 0xc0000000 - 16KB
+ * +----------+ <- 0xc0000000 - 32KB
  * |          |
  * |  empty   |
  * |          |
@@ -109,6 +109,9 @@ typedef struct {
     Elf64_Xword p_memsz; /* Segment size in memory */
     Elf64_Xword p_align; /* Segment alignment */
 } Elf64_Phdr;
+
+// Only valid value for e_machine
+#define EM_AARCH64 183 /* ARM AARCH64 */
 
 extern int exec(const char *path, char **argv);
 extern int fork();
